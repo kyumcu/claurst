@@ -21,6 +21,9 @@ message_actions = []
 quick_search = []
 away_summary = []
 hook_prompts = []
+kairos_brief = []
+kairos_channels = []
+lodestone = []
 
 # Agents & Memory features
 agent_triggers = []
@@ -43,19 +46,27 @@ new_init = []
 powershell_auto_mode = []
 shot_stats = []
 tree_sitter_bash = []
+tree_sitter_bash_shadow = []
 prompt_cache_break_detection = []
+native_clipboard_image = []
+ccr_auto_connect = []
+ccr_mirror = []
+ccr_remote_setup = []
 
-# Full dev build — includes all experimental features
+# Full dev build — includes all experimental features (36 total)
 dev_full = [
     "voice",
     "ultraplan", "ultrathink", "history_picker",
     "token_budget", "message_actions", "quick_search", "away_summary",
-    "hook_prompts", "agent_triggers", "agent_triggers_remote",
+    "hook_prompts", "kairos_brief", "kairos_channels", "lodestone",
+    "agent_triggers", "agent_triggers_remote",
     "extract_memories", "verification_agent", "builtin_explore_plan_agents",
     "cached_microcompact", "compaction_reminders", "agent_memory_snapshot",
     "teammem", "bash_classifier", "bridge_mode", "mcp_rich_output",
     "connector_text", "unattended_retry", "new_init",
     "powershell_auto_mode", "shot_stats", "tree_sitter_bash",
+    "tree_sitter_bash_shadow", "native_clipboard_image",
+    "ccr_auto_connect", "ccr_mirror", "ccr_remote_setup",
     "prompt_cache_break_detection",
 ]
 
