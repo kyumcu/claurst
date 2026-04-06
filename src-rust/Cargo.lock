@@ -585,9 +585,7 @@ dependencies = [
  "base64",
  "chrono",
  "clap",
- "claurst-acp",
  "claurst-api",
- "claurst-bridge",
  "claurst-commands",
  "claurst-core",
  "claurst-mcp",
@@ -611,21 +609,6 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
-]
-
-[[package]]
-name = "claurst-acp"
-version = "0.0.8"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "claurst-api",
- "claurst-core",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -659,48 +642,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "claurst-bridge"
-version = "0.0.8"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64",
- "chrono",
- "claurst-api",
- "claurst-core",
- "claurst-query",
- "dirs",
- "futures",
- "hex",
- "hostname",
- "parking_lot",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "claurst-buddy"
-version = "0.0.8"
-dependencies = [
- "anyhow",
- "chrono",
- "claurst-core",
- "hex",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
 name = "claurst-commands"
 version = "0.0.8"
 dependencies = [
@@ -710,7 +651,6 @@ dependencies = [
  "base64",
  "chrono",
  "claurst-api",
- "claurst-bridge",
  "claurst-core",
  "claurst-mcp",
  "claurst-plugins",

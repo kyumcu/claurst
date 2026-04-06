@@ -28,10 +28,6 @@ pub const MIGRATIONS: &[(&str, MigrationFn)] = &[
         "migrate_bypass_permissions_to_settings",
         migrate_bypass_permissions_to_settings,
     ),
-    (
-        "migrate_repl_bridge_to_remote_control",
-        migrate_repl_bridge_to_remote_control,
-    ),
     ("migrate_enable_all_mcp_servers", migrate_enable_all_mcp_servers),
     ("migrate_auto_updates", migrate_auto_updates),
     ("reset_auto_mode_opt_in", reset_auto_mode_opt_in),
@@ -174,23 +170,6 @@ fn migrate_bypass_permissions_to_settings(settings: &mut Value) -> bool {
 
     if let Some(obj) = settings.as_object_mut() {
         obj.remove("bypassPermissionsAccepted");
-    }
-    true
-}
-
-/// Rename `replBridgeEnabled` → `remoteControlAtStartup`.
-fn migrate_repl_bridge_to_remote_control(settings: &mut Value) -> bool {
-    let old = match settings.get("replBridgeEnabled").cloned() {
-        Some(v) => v,
-        None => return false,
-    };
-
-    if settings.get("remoteControlAtStartup").is_none() {
-        settings["remoteControlAtStartup"] = old;
-    }
-
-    if let Some(obj) = settings.as_object_mut() {
-        obj.remove("replBridgeEnabled");
     }
     true
 }
@@ -394,14 +373,6 @@ mod tests {
         let mut s = json!({ "bypassPermissionsAccepted": false });
         assert!(migrate_bypass_permissions_to_settings(&mut s));
         assert!(s.get("permissionMode").is_none());
-    }
-
-    #[test]
-    fn repl_bridge_renames_field() {
-        let mut s = json!({ "replBridgeEnabled": true });
-        assert!(migrate_repl_bridge_to_remote_control(&mut s));
-        assert!(s.get("replBridgeEnabled").is_none());
-        assert_eq!(s["remoteControlAtStartup"].as_bool(), Some(true));
     }
 
     #[test]
