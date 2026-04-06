@@ -10,6 +10,7 @@ This is not a design doc for every fix. It is a sequencing document.
 2. Fix shared provider canonicalization before patching individual provider-specific symptoms.
 3. Fix runtime truth mismatches before improving reporting surfaces.
 4. Prefer coordinated cross-module sweeps where one root cause appears in many crates.
+5. Prefer shrinking or disabling misleading optional surfaces over investing in broad partial support.
 
 ## Phase 0: Stabilize the Safety Boundary
 
@@ -107,6 +108,10 @@ Why now:
 - reported plugin state currently diverges from active runtime behavior
 - reload is a central operational workflow for extensibility
 
+Decision gate after 1.4:
+- if plugins are not core to the product, stop after making the current behavior honest and stable
+- do not expand marketplace or reload breadth before the core local workflow is finished
+
 ## Phase 2: Canonicalize Provider Identity Everywhere
 
 Goal: eliminate the largest cross-cutting source of inconsistent behavior in the codebase.
@@ -193,6 +198,9 @@ Why here:
 - ACP is externally consumed, so misleading behavior creates integration churn
 - it should be corrected after the core runtime/provider layer is stabilized
 
+Preferred lean outcome:
+- if ACP is not a near-term product requirement, reduce it to a minimal honest surface instead of broadening implementation
+
 ### 3.2 Commands reporting truthfulness
 
 Source:
@@ -218,6 +226,10 @@ Why here:
 - some pieces are close to show-stopper severity, but they still depend on a clear runtime contract
 - this should follow the earlier stabilization work unless MCP is your immediate product priority
 
+Preferred lean outcome:
+- support only the MCP transports and routing patterns that are actually used
+- defer broader MCP capability breadth until the local-first core is complete
+
 ### 3.4 Bridge config/API contract cleanup
 
 Source:
@@ -229,6 +241,9 @@ Fix set:
 
 Why here:
 - these are contract cleanups after event durability and reconnect correctness are fixed
+
+Preferred lean outcome:
+- if bridge is not strategically necessary, keep it minimal or disable it instead of deepening remote-control complexity
 
 ## Phase 4: Metadata Quality and Lower-Risk Correctness
 
@@ -271,6 +286,45 @@ Fix set:
 - per-user persistence scoping
 - atomic writes
 - explicit load-failure handling
+
+Preferred lean outcome:
+- do this only if `buddy` remains in scope
+- otherwise mark the subsystem as optional and keep it isolated from core refactor work
+
+## Phase 5: Scope Reduction and Simplification
+
+Goal: remove or reduce parts of the codebase that add complexity without strengthening the local `llama.cpp` workflow.
+
+### 5.1 Reduce provider sprawl pressure
+
+Targets:
+- alias handling duplicated across many crates
+- remote-provider-specific branches that do not meet the core quality bar
+
+Outcome:
+- one canonical provider system
+- fewer ad hoc compatibility branches
+
+### 5.2 Shrink optional integration surfaces
+
+Targets:
+- `acp`
+- `bridge`
+- `buddy`
+
+Outcome:
+- either minimal honest scope or explicit optional status
+- no broad partially implemented contracts competing with the core runtime
+
+### 5.3 Keep plugins and MCP on a strict scope budget
+
+Targets:
+- plugin marketplace and reload behavior
+- MCP transport and routing breadth
+
+Outcome:
+- only keep the portions that are reliable and actively needed
+- defer the rest instead of maintaining misleading partial behavior
 
 ## Suggested Workstream Split
 
@@ -317,6 +371,7 @@ Modules:
 - `query` compaction and stream-error fixes do not depend on provider canonicalization and should be done immediately.
 - `commands /providers` should wait until runtime provider truth is fixed in `core` and `api`.
 - ACP runtime-backed model/tool discovery should ideally wait until provider/tool truth surfaces are stabilized.
+- scope-reduction decisions for `acp`, `bridge`, `mcp`, `plugins`, and `buddy` should be made before investing in feature expansion within those modules.
 
 ## Fastest Risk-Reduction Order
 
@@ -331,6 +386,7 @@ If only a small number of fixes can be done now, use this order:
 7. `plugins`: real reload semantics.
 8. `acp`: remove or implement fake session behavior.
 9. `mcp`: real transport support and OAuth completion correctness.
+10. reduce or disable optional surfaces that are still not aligned with the local-first vision.
 
 ## Completion Criterion
 
@@ -341,3 +397,4 @@ The refactor/reliability wave is in good shape when:
 - provider identity is canonical across config, runtime, UI, and auth
 - operational surfaces report actual runtime truth
 - plugin and bridge state survive transient failures without silent drift
+- optional modules have either honest minimal scope or are no longer on the critical path
