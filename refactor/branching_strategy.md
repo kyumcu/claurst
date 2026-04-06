@@ -43,6 +43,18 @@ If these land in one long-lived branch:
 
 For this codebase, that is more practical than constantly switching one checkout.
 
+## Local Coordination Layout
+
+Use a gitignored `.codex/` directory inside the repo as the local coordination root.
+
+Recommended structure:
+
+- `.codex/worktrees/` for git worktrees
+- `.codex/agents/` for per-agent directives and handoff files
+- `.codex/logs/` for optional local notes
+
+This keeps worktrees near the repo while avoiding tracked-file noise.
+
 ## Target Model
 
 ### 1. Integration branch
@@ -81,23 +93,35 @@ Optional follow-up branches:
 
 ## Recommended Worktree Layout
 
-Suggested sibling directories:
+Suggested directories under `.codex/worktrees/`:
 
-- `../claurst-integration`
-- `../claurst-remove`
-- `../claurst-runtime`
-- `../claurst-provider-foundation`
-- `../claurst-provider-rollout`
-- `../claurst-plugins`
+- `.codex/worktrees/integration`
+- `.codex/worktrees/remove`
+- `.codex/worktrees/runtime`
+- `.codex/worktrees/provider-foundation`
+- `.codex/worktrees/provider-breadth`
+- `.codex/worktrees/provider-rollout`
+- `.codex/worktrees/plugins`
 
 Map them like this:
 
-- `../claurst-integration` → `refactor/llamacpp-first`
-- `../claurst-remove` → `remove/bridge-acp-buddy`
-- `../claurst-runtime` → `fix/query-safety`
-- `../claurst-provider-foundation` → `refactor/provider-foundation`
-- `../claurst-provider-rollout` → `refactor/provider-rollout`
-- `../claurst-plugins` → `fix/plugins-core-only`
+- `.codex/worktrees/integration` → `refactor/llamacpp-first`
+- `.codex/worktrees/remove` → `remove/bridge-acp-buddy`
+- `.codex/worktrees/runtime` → `fix/query-safety`
+- `.codex/worktrees/provider-foundation` → `refactor/provider-foundation`
+- `.codex/worktrees/provider-breadth` → `simplify/provider-breadth`
+- `.codex/worktrees/provider-rollout` → `refactor/provider-rollout`
+- `.codex/worktrees/plugins` → `fix/plugins-core-only`
+
+Recommended coordination files:
+
+- `.codex/agents/integration.md`
+- `.codex/agents/remove.md`
+- `.codex/agents/runtime.md`
+- `.codex/agents/provider-foundation.md`
+- `.codex/agents/provider-breadth.md`
+- `.codex/agents/provider-rollout.md`
+- `.codex/agents/plugins.md`
 
 ## Ownership Guidance
 
@@ -238,14 +262,15 @@ Example setup:
 
 ```bash
 git switch -c refactor/llamacpp-first
-git worktree add ../claurst-integration refactor/llamacpp-first
+mkdir -p .codex/worktrees .codex/agents .codex/logs
+git worktree add .codex/worktrees/integration refactor/llamacpp-first
 
-git worktree add -b remove/bridge-acp-buddy ../claurst-remove HEAD
-git worktree add -b fix/query-safety ../claurst-runtime HEAD
-git worktree add -b refactor/provider-foundation ../claurst-provider-foundation HEAD
-git worktree add -b simplify/provider-breadth ../claurst-provider-breadth HEAD
-git worktree add -b refactor/provider-rollout ../claurst-provider-rollout HEAD
-git worktree add -b fix/plugins-core-only ../claurst-plugins HEAD
+git worktree add -b remove/bridge-acp-buddy .codex/worktrees/remove HEAD
+git worktree add -b fix/query-safety .codex/worktrees/runtime HEAD
+git worktree add -b refactor/provider-foundation .codex/worktrees/provider-foundation HEAD
+git worktree add -b simplify/provider-breadth .codex/worktrees/provider-breadth HEAD
+git worktree add -b refactor/provider-rollout .codex/worktrees/provider-rollout HEAD
+git worktree add -b fix/plugins-core-only .codex/worktrees/plugins HEAD
 ```
 
 ## Decision Summary

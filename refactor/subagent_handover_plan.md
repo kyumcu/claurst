@@ -8,6 +8,12 @@ This document assumes the target direction in:
 - [execution_roadmap.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/execution_roadmap.md)
 - [urgency_classification.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/urgency_classification.md)
 
+Local execution layout:
+
+- worktrees live under `.codex/worktrees/`
+- per-agent directives live under `.codex/agents/`
+- each sub-agent should be assigned one worktree plus one directive file
+
 ## Handover Principles
 
 1. Assign ownership by module, not by abstract theme alone.
@@ -264,6 +270,11 @@ Suggested output format from each sub-agent:
 - unresolved risks
 - whether follow-up from another agent is required
 
+Suggested local files per agent:
+
+- `.codex/agents/<agent-name>.md` for instructions and status
+- `.codex/worktrees/<agent-name>/` for the actual branch checkout
+
 ## Coordination Rules
 
 - do not revert unrelated edits
@@ -285,6 +296,11 @@ Assign Agent 1:
 - fix `query` stream error handling
 - enforce `tools` path boundaries
 
+Use:
+
+- directive file: `.codex/agents/runtime.md`
+- worktree: `.codex/worktrees/runtime`
+
 ### Second handoff
 
 Assign Agent 5:
@@ -293,6 +309,11 @@ Assign Agent 5:
 - remove `acp`
 - remove `buddy`
 - keep the repo buildable without them
+
+Use:
+
+- directive file: `.codex/agents/remove.md`
+- worktree: `.codex/worktrees/remove`
 
 ### Third handoff
 
@@ -303,6 +324,11 @@ Assign Agent 2:
 - remove hidden Anthropic-first shared fallbacks
 - keep abstraction cleanup bounded to places where it improves real shared behavior
 - drop lower-priority providers where they complicate the shared runtime
+
+Use:
+
+- directive file: `.codex/agents/provider-foundation.md`
+- worktree: `.codex/worktrees/provider-foundation`
 
 ### Fourth handoff
 
@@ -318,6 +344,11 @@ Assign Agent 3:
 - verify `llama.cpp` end-to-end behavior
 - remove Anthropic-first UX and default-selection behavior
 - only generalize internal types if they are actively blocking provider-neutral behavior
+
+Use:
+
+- directive file: `.codex/agents/provider-rollout.md`
+- worktree: `.codex/worktrees/provider-rollout`
 
 ### Sixth handoff
 
