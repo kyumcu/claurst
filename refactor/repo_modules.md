@@ -1,6 +1,6 @@
 # Repository Modules
 
-This repository's critical infrastructure is centered in the Rust workspace under `src-rust`. The main modules are declared in `src-rust/Cargo.toml`, and the architecture summary is documented in `spec/13_rust_codebase.md`.
+This repository's critical infrastructure is centered in the Rust workspace under `src-rust`. The current architecture below reflects the post-refactor codebase, not the earlier broader scope.
 
 ## Dependency Graph
 
@@ -8,13 +8,11 @@ This repository's critical infrastructure is centered in the Rust workspace unde
 claurst (CLI binary)
   -> claurst-core
   -> claurst-api
-  -> claurst-acp
   -> claurst-tools
   -> claurst-query
   -> claurst-tui
   -> claurst-commands
   -> claurst-mcp
-  -> claurst-bridge
   -> claurst-plugins
 
 claurst-commands
@@ -25,7 +23,6 @@ claurst-commands
   -> claurst-mcp
   -> claurst-tui
   -> claurst-plugins
-  -> claurst-bridge
 
 claurst-tui
   -> claurst-core
@@ -45,15 +42,6 @@ claurst-tools
   -> claurst-api
   -> claurst-mcp
 
-claurst-bridge
-  -> claurst-core
-  -> claurst-api
-  -> claurst-query
-
-claurst-acp
-  -> claurst-core
-  -> claurst-api
-
 claurst-api
   -> claurst-core
 
@@ -62,15 +50,12 @@ claurst-mcp
 
 claurst-plugins
   -> claurst-core
-
-claurst-buddy
-  -> claurst-core
 ```
 
 ## Critical Infrastructure
 
 - `src-rust/crates/cli`
-  Binary entrypoint. Starts the app, parses CLI flags, wires config, TUI, query loop, auth, bridge, MCP, and plugins. Main executable is `src-rust/crates/cli/src/main.rs`.
+  Binary entrypoint. Starts the app, parses CLI flags, wires config, TUI, query loop, auth, MCP, and plugins. Main executable is `src-rust/crates/cli/src/main.rs`.
 
 - `src-rust/crates/core`
   Foundation crate used by everything else. This is the most important infrastructure layer.
@@ -124,8 +109,7 @@ claurst-buddy
   - grep/glob
   - MCP resource access
   - web fetch/search
-  - tasks/sub-agents
-  - cron/worktree/config/plan-mode tools
+  - task/config tools
 
   Representative files:
   - `src-rust/crates/tools/src/lib.rs`
@@ -163,29 +147,11 @@ claurst-buddy
   - `src-rust/crates/mcp/src/registry.rs`
 
 - `src-rust/crates/plugins`
-  Plugin runtime. Plugin manifests, loading, registry, marketplace, and hooks integration.
+  Plugin runtime. Plugin manifests, loading, registry, and hooks integration. The maintained scope is local-only core behavior rather than marketplace or hot-reload breadth.
 
   Files:
   - `src-rust/crates/plugins/src/lib.rs`
   - `src-rust/crates/plugins/src/loader.rs`
-  - `src-rust/crates/plugins/src/marketplace.rs`
-
-- `src-rust/crates/bridge`
-  Bridge to remote/web UI and session-sharing infrastructure. Depends on `core`, `api`, and `query`.
-
-  Main file:
-  - `src-rust/crates/bridge/src/lib.rs`
-
-- `src-rust/crates/acp`
-  ACP server implementation: JSON-RPC 2.0 over stdio for agent/client integration.
-
-  Main file:
-  - `src-rust/crates/acp/src/lib.rs`
-
-## Secondary / Specialized Modules
-
-- `src-rust/crates/buddy`
-  Separate buddy/tamagotchi-style subsystem. Peripheral, not core execution infrastructure.
 
 ## Practical Module Hierarchy
 
@@ -195,9 +161,8 @@ claurst-buddy
 4. `tools`: executable capabilities used by the model
 5. `tui`: user interface and interaction state
 6. `commands`: command workflows layered on top of TUI/query/core
-7. `mcp`, `plugins`, `bridge`, `acp`: integration infrastructure
+7. `mcp`, `plugins`: integration infrastructure
 8. `cli`: executable composition root
-9. `buddy`: optional peripheral subsystem
 
 ## Short Architectural Summary
 
@@ -207,4 +172,4 @@ The critical path is:
 
 The main integration subsystems hanging off that path are:
 
-`mcp`, `plugins`, `bridge`, `acp`
+`mcp`, `plugins`

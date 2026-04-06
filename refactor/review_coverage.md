@@ -1,12 +1,16 @@
 # Review Coverage
 
-Scope checked against: [`refactor/repo_modules.md`](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/repo_modules.md)
+Purpose: record which module review files exist in `refactor/` and clarify that this review set is partly historical.
 
-## Status
+## Current Meaning
 
-All modules currently described in `repo_modules.md` now have a corresponding review file in `refactor/`.
+- the review files in `refactor/` are a review archive from the refactor process
+- some review files cover modules that have since been removed
+- the current live module inventory is described in [`refactor/repo_modules.md`](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/repo_modules.md)
 
-Reviewed modules:
+## Review Files Present
+
+Active-scope modules:
 
 - `query` → `refactor/query_review.md`
 - `api` → `refactor/api_review.md`
@@ -17,12 +21,18 @@ Reviewed modules:
 - `cli` → `refactor/cli_review.md`
 - `mcp` → `refactor/mcp_review.md`
 - `plugins` → `refactor/plugins_review.md`
+
+Historical removed-scope modules:
+
 - `bridge` → `refactor/bridge_review.md`
 - `acp` → `refactor/acp_review.md`
 - `buddy` → `refactor/buddy_review.md`
 
 ## Conclusion
 
-There is no remaining uncovered module from the current `repo_modules.md` inventory to review.
+The review archive is complete for both:
 
-If `repo_modules.md` is expanded later, the next review should target any newly added module that does not yet have a matching `refactor/*_review.md` file.
+- the current active module set
+- the removed modules that were explicitly reviewed during the refactor
+
+If new modules are added later, add a matching `refactor/*_review.md` file only if a fresh review pass is actually performed.

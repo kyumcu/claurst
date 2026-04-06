@@ -1,174 +1,104 @@
-# Refactor Completion Plan
+# Remaining Refactor To-Do
 
-Purpose: record the path that was used to complete the refactor and define the small amount of cleanup that remains after completion.
+Purpose: define the small amount of cleanup that remains after the completed `llama.cpp`-first refactor.
 
 Current baseline:
 
-- `main` is at `8d1a2d5`
-- `bridge`, `acp`, and `buddy` are already removed
-- query/tools safety fixes are already merged
-- provider foundation in `core` and `api` is already merged
-- provider rollout is already merged
-- provider breadth reduction is already merged
-- plugin scope reduction is already merged
-- final verification and active-path cleanup are already merged
-- no active worktrees are required for the completed refactor state
+- `llama.cpp` is the first-class path
+- Anthropic is optional best-effort support
+- `bridge`, `acp`, and `buddy` are removed
+- provider breadth was reduced
+- plugins were reduced to an honest local-only core
+- final verification already passed on the active product path
+
+This file is intentionally forward-looking. Completed execution history was removed from here to keep the remaining work clear.
+
+## Remaining Work
+
+### 1. Dead-Code Purge
+
+Goal:
+- remove internal provider leftovers and dead branches that no longer affect active behavior
+
+Focus:
+- `src-rust/crates/api`
+- `src-rust/crates/core`
+- `src-rust/crates/tui`
+
+Examples:
+- unused provider constants
+- unused provider adapters
+- stale helper branches that mention removed providers
+
+Done when:
+- active code paths no longer carry obviously dead provider-specific scaffolding
+- the remaining provider surface in code matches the supported product surface
+
+### 2. Refactor Doc Cleanup
+
+Goal:
+- keep only useful current-state docs in `refactor/`
+
+Required work:
+- remove planning docs that only describe already-finished execution
+- keep architectural references and review docs only if they still provide value
+- ensure surviving docs match the current codebase
+
+Done when:
+- `refactor/` is easier to scan
+- there is one clear current to-do plan instead of many completed plans
+
+### 3. Secondary-Scope Confirmation
+
+Goal:
+- confirm that remaining secondary surfaces stay honest and minimal
+
+Focus:
+- `mcp`
+- remaining `plugins` surface
+
+Required work:
+- check that current behavior matches current product claims
+- avoid reopening feature breadth unless it directly supports the local-first core
+
+Done when:
+- no remaining secondary surface overclaims runtime capability
+
+### 4. Selective Internal Cleanup
+
+Goal:
+- improve maintainability only where it still helps the lean local-first core
+
+Allowed scope:
+- shared abstractions that still create real confusion or coupling
+- narrow cleanup that reduces maintenance cost
+
+Not in scope:
+- broad renaming for aesthetics
+- provider-neutral abstraction work that does not improve behavior or maintenance
+
+Done when:
+- remaining cleanup improves clarity or code size without reopening the refactor
 
 ## Working Rules
 
 1. Keep `llama.cpp` first-class and Anthropic best-effort only.
 2. Do not reopen removed subsystems.
-3. Treat the topic-lane history below as archival context, not an active branching plan.
+3. Prefer deletion over carrying dead compatibility branches.
+4. Treat this as cleanup work, not a new architectural rewrite.
 
-## Phase 1: Provider Rollout
+## Recommended Order
 
-Worktree:
-- `.codex/worktrees/provider-rollout`
+1. dead-code purge
+2. refactor doc cleanup
+3. secondary-scope confirmation
+4. selective internal cleanup only if still justified
 
-Goal:
-- turn the merged provider foundation into actual `llama.cpp`-first user-facing behavior
+## Definition Of Done
 
-Scope:
-- `src-rust/crates/tui`
-- `src-rust/crates/commands`
-- `src-rust/crates/cli`
-- minimal `src-rust/crates/query` glue only if strictly required
+The remaining refactor work is done when:
 
-Required work:
-- make `/connect` persist canonical provider IDs only
-- make `/model` and model picker behavior consume canonical provider logic
-- make startup and resume keep provider/model state synchronized
-- remove remaining Anthropic-first defaults from UI and command flows
-- ensure `llama.cpp` is the clean default local path
-
-Verification:
-- targeted `cargo check` for changed crates
-- targeted tests for provider/model selection logic where available
-- manual local verification of:
-  - `/connect` with `llama.cpp`
-  - `/model`
-  - startup/resume behavior
-
-Status:
-- completed and merged into `main`
-- landed before `d29afa8`
-
-## Phase 2: Provider Breadth Reduction
-
-Worktree:
-- `.codex/worktrees/provider-breadth`
-
-Goal:
-- reduce provider surface area to match the lean local-first product direction
-
-Scope:
-- provider lists
-- provider registry exposure
-- command/UI surfaces that enumerate providers
-- related docs or config defaults if they become misleading
-
-Required work:
-- remove lower-priority providers that are no longer worth carrying
-- keep Anthropic only as best-effort optional support
-- ensure remaining provider choices are honest and coherent
-- remove stale alias-driven or dead provider paths where they no longer serve the product
-
-Verification:
-- targeted `cargo check`
-- targeted provider registry and default-model tests
-- sanity-check `/connect` and `/providers` style flows after pruning
-
-Status:
-- completed and merged into `main`
-- landed before `c466424`
-
-## Phase 3: Plugins Decision And Cleanup
-
-Worktree:
-- `.codex/worktrees/plugins`
-
-Goal:
-- either keep plugins as a reduced honest surface or trim them further
-
-Required work:
-- compare current plugin behavior to the lean local-first vision
-- remove or reduce misleading plugin behavior if necessary
-- avoid expanding plugin complexity before the core path is complete
-
-Verification:
-- targeted `cargo check`
-- targeted plugin lifecycle tests if touched
-
-Status:
-- completed and merged into `main`
-- live plugin reload removed
-- marketplace surface removed
-- local plugin install/list/info/enable/disable kept as the honest core
-- landed before `fa96395`
-
-## Phase 4: Final Verification
-
-Worktree:
-- main checkout or `.codex/worktrees/integration`
-
-Goal:
-- prove the refactor is complete in real product terms
-
-Required verification:
-- full `cargo check`
-- targeted tests for:
-  - provider canonicalization
-  - runtime safety fixes
-  - provider/model flow correctness
-- manual `llama.cpp` happy-path verification:
-  - connect
-  - model discovery
-  - prompt/response loop
-  - resume behavior
-
-Also verify:
-- no stale product-facing references to `bridge`, `acp`, or `buddy`
-- no stale Anthropic-first UX defaults in active flows
-- no lower-priority provider surfaces that contradict the new scope
-
-Status:
-- completed and merged into `main`
-- full workspace checks passed
-- local `llama.cpp` happy-path verification passed against a live local endpoint
-
-## Phase 5: Final Cleanup
-
-Goal:
-- remove remaining confusion after the technical refactor is complete
-
-Required work:
-- update or archive refactor docs that no longer reflect the live repo state
-- remove stale branches/worktree lanes if no longer needed
-- clean up obsolete comments or docs that still describe old behavior
-
-Status:
-- completed for the active product path
-- remaining work, if any, is optional deeper dead-code cleanup rather than refactor-critical work
-
-## Current Remaining Work
-
-1. optional deeper removal of unused provider modules/constants that no longer affect active behavior
-2. optional archival cleanup in `refactor/` if you want to shrink historical planning material
-3. normal maintenance on top of the completed local-first baseline
-
-## Definition Of Completion
-
-The refactor is complete when:
-
-- `llama.cpp` is the clean first-class path end to end
-- Anthropic is optional and not central
-- lower-priority providers are removed or clearly reduced
-- `bridge`, `acp`, and `buddy` remain gone
-- query/tools safety fixes remain intact
-- `main` passes verification
-- the live codebase behavior matches the vision in `refactor/codebase_vision.md`
-
-Current assessment:
-
-- complete for the intended `llama.cpp`-first refactor scope
-- suitable as the post-refactor baseline on `main`
+- no misleading active-path code remains for removed providers or subsystems
+- `refactor/` contains only useful current-state docs plus any deliberately kept review archive
+- secondary surfaces stay minimal and truthful
+- the codebase remains aligned with `refactor/codebase_vision.md`
