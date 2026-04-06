@@ -2134,49 +2134,6 @@ async fn run_interactive(
         if let Some(provider_id) = app.device_auth_pending.take() {
             let _tx = device_auth_tx.clone();
             match provider_id.as_str() {
-                "github-copilot" => {
-                    let tx2 = device_auth_tx.clone();
-                    // Use the OpenCode Copilot OAuth app (Ov23li8tweQw6odWQebz)
-                    // which is registered and authorised for the Copilot API.
-                    // Tokens from an unregistered app get "model not supported"
-                    // on every model.
-                    const COPILOT_CLIENT_ID: &str = "Ov23li8tweQw6odWQebz";
-                    tokio::spawn(async move {
-                        // Step 1: Request device code
-                        match claurst_core::device_code::request_device_code(
-                            COPILOT_CLIENT_ID,
-                            "read:user",
-                            "https://github.com/login/device/code",
-                        ).await {
-                            Ok(resp) => {
-                                let _ = tx2.send(DeviceAuthEvent::GotCode {
-                                    user_code: resp.user_code,
-                                    verification_uri: resp.verification_uri,
-                                    device_code: resp.device_code.clone(),
-                                    interval: resp.interval,
-                                }).await;
-                                // Step 2: Poll for access token
-                                match claurst_core::device_code::poll_for_token(
-                                    COPILOT_CLIENT_ID,
-                                    &resp.device_code,
-                                    "https://github.com/login/oauth/access_token",
-                                    resp.interval,
-                                    300,
-                                ).await {
-                                    Ok(token) => {
-                                        let _ = tx2.send(DeviceAuthEvent::TokenReceived(token)).await;
-                                    }
-                                    Err(e) => {
-                                        let _ = tx2.send(DeviceAuthEvent::Error(e)).await;
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                let _ = tx2.send(DeviceAuthEvent::Error(e)).await;
-                            }
-                        }
-                    });
-                }
                 "anthropic" => {
                     let tx2 = device_auth_tx.clone();
                     // Anthropic OAuth requires a registered application.

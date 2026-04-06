@@ -2451,7 +2451,7 @@ impl App {
             return false;
         }
 
-        // Device code / browser auth dialog (GitHub Copilot, Anthropic OAuth)
+        // Device code / browser auth dialog (OpenAI Codex login)
         if self.device_auth_dialog.visible {
             match key.code {
                 KeyCode::Esc => {
@@ -2464,15 +2464,7 @@ impl App {
                         let provider_id = self.device_auth_dialog.provider_id.clone();
                         let provider_name = self.device_auth_dialog.provider_name.clone();
                         let token = token.clone();
-                        let credential = if provider_id == "github-copilot" {
-                            claurst_core::StoredCredential::OAuthToken {
-                                access: token.clone(),
-                                refresh: token,
-                                expires: 0,
-                            }
-                        } else {
-                            claurst_core::StoredCredential::ApiKey { key: token }
-                        };
+                        let credential = claurst_core::StoredCredential::ApiKey { key: token };
                         self.auth_store.set(
                             &provider_id,
                             credential,
@@ -2548,20 +2540,10 @@ impl App {
                                 // (OAuth requires a registered app which Claurst doesn't have)
                                 self.key_input_dialog.open(selected.id.clone(), selected.title.clone());
                             }
-                            "github-copilot" => {
-                                // GitHub Copilot: device code flow
-                                self.device_auth_dialog.open(selected.id.clone(), selected.title.clone());
-                                self.device_auth_pending = Some("github-copilot".to_string());
-                            }
                             "openai-codex" => {
                                 // OpenAI Codex: browser OAuth flow (spawned by main loop)
                                 self.device_auth_dialog.open("openai-codex".into(), "OpenAI Codex".into());
                                 self.device_auth_pending = Some("openai-codex".to_string());
-                            }
-                            // AWS Bedrock — accept a bearer token via key input dialog
-                            "amazon-bedrock" => {
-                                self.key_input_dialog
-                                    .open(selected.id.clone(), selected.title.clone());
                             }
                             // All other providers — open API key input dialog
                             _ => {

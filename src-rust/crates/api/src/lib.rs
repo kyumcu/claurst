@@ -82,19 +82,8 @@ pub use model_registry::{ModelEntry, ModelRegistry, effective_model_for_config};
 // Phase 6 re-exports — provider-aware error handling.
 pub use error_handling::{is_context_overflow, parse_error_response, RetryConfig};
 
-// Phase 2E re-exports — Azure, Bedrock, and GitHub Copilot providers.
-pub use providers::AzureProvider;
-pub use providers::BedrockProvider;
-pub use providers::CopilotProvider;
-
-// Phase 2B re-exports — OpenAI-compatible generic adapter + common factories.
-pub use providers::{
-    OpenAiCompatProvider,
-    ollama, lm_studio, deepseek, groq, xai, openrouter, mistral,
-};
-
-// Phase 2D re-exports — Cohere native provider.
-pub use providers::CohereProvider;
+// Re-exports for the retained local-first provider surface.
+pub use providers::{OpenAiCompatProvider, llama_cpp, lm_studio, ollama};
 
 // Phase 4 re-exports — concrete message transformers.
 pub use transformers::{AnthropicTransformer, OpenAiChatTransformer};
@@ -509,29 +498,9 @@ pub mod client {
                         "Model '{}' is an OpenAI model. Use `--provider openai` or set OPENAI_API_KEY.",
                         model
                     )
-                } else if model.starts_with("deepseek") {
-                    format!(
-                        "Model '{}' is a DeepSeek model. Use `--provider deepseek` or set DEEPSEEK_API_KEY.",
-                        model
-                    )
-                } else if model.starts_with("grok") {
-                    format!(
-                        "Model '{}' is an xAI model. Use `--provider xai` or set XAI_API_KEY.",
-                        model
-                    )
-                } else if model.starts_with("mistral") || model.starts_with("codestral") {
-                    format!(
-                        "Model '{}' is a Mistral model. Use `--provider mistral` or set MISTRAL_API_KEY.",
-                        model
-                    )
-                } else if model.starts_with("command-") {
-                    format!(
-                        "Model '{}' is a Cohere model. Use `--provider cohere` or set COHERE_API_KEY.",
-                        model
-                    )
                 } else if model.starts_with("llama") {
                     format!(
-                        "Model '{}' looks like a Llama model. Use `--provider groq` (set GROQ_API_KEY) or `--provider ollama` for local.",
+                        "Model '{}' looks like a Llama model. Use `--provider llama-cpp` or `--provider ollama` for local.",
                         model
                     )
                 } else {
@@ -627,16 +596,8 @@ pub mod client {
                         "Model '{}' is an OpenAI model. Use `--provider openai` or set OPENAI_API_KEY.",
                         model
                     )
-                } else if model.starts_with("deepseek") {
-                    format!("Model '{}' is a DeepSeek model. Use `--provider deepseek` or set DEEPSEEK_API_KEY.", model)
-                } else if model.starts_with("grok") {
-                    format!("Model '{}' is an xAI model. Use `--provider xai` or set XAI_API_KEY.", model)
-                } else if model.starts_with("mistral") || model.starts_with("codestral") {
-                    format!("Model '{}' is a Mistral model. Use `--provider mistral` or set MISTRAL_API_KEY.", model)
-                } else if model.starts_with("command-") {
-                    format!("Model '{}' is a Cohere model. Use `--provider cohere` or set COHERE_API_KEY.", model)
                 } else if model.starts_with("llama") {
-                    format!("Model '{}' looks like a Llama model. Use `--provider groq` or `--provider ollama` for local.", model)
+                    format!("Model '{}' looks like a Llama model. Use `--provider llama-cpp` or `--provider ollama` for local.", model)
                 } else {
                     "Set ANTHROPIC_API_KEY, run `claurst auth login`, \
                      or use --provider to select a different provider (e.g. --provider openai).".to_string()

@@ -100,18 +100,6 @@ impl AuthStore {
                         return Some(key.clone());
                     }
                 }
-                StoredCredential::OAuthToken {
-                    access,
-                    refresh,
-                    .. 
-                } if canonical == "github-copilot" => {
-                    if !refresh.is_empty() {
-                        return Some(refresh.clone());
-                    }
-                    if !access.is_empty() {
-                        return Some(access.clone());
-                    }
-                }
                 _ => {}
             }
         }
@@ -120,21 +108,6 @@ impl AuthStore {
             "anthropic" => "ANTHROPIC_API_KEY",
             "openai" => "OPENAI_API_KEY",
             "google" => "GOOGLE_API_KEY",
-            "groq" => "GROQ_API_KEY",
-            "cerebras" => "CEREBRAS_API_KEY",
-            "deepseek" => "DEEPSEEK_API_KEY",
-            "mistral" => "MISTRAL_API_KEY",
-            "xai" => "XAI_API_KEY",
-            "openrouter" => "OPENROUTER_API_KEY",
-            "together-ai" => "TOGETHER_API_KEY",
-            "perplexity" => "PERPLEXITY_API_KEY",
-            "cohere" => "COHERE_API_KEY",
-            "deepinfra" => "DEEPINFRA_API_KEY",
-            "venice" => "VENICE_API_KEY",
-            "github-copilot" => "GITHUB_TOKEN",
-            "azure" => "AZURE_API_KEY",
-            "huggingface" => "HF_TOKEN",
-            "nvidia" => "NVIDIA_API_KEY",
             _ => return None,
         };
         std::env::var(env_var).ok().filter(|k| !k.is_empty())
@@ -146,34 +119,16 @@ mod tests {
     use super::{AuthStore, StoredCredential};
 
     #[test]
-    fn github_copilot_oauth_prefers_refresh_token() {
-        let mut store = AuthStore::default();
-        store.credentials.insert(
-            "github-copilot".to_string(),
-            StoredCredential::OAuthToken {
-                access: "access-token".to_string(),
-                refresh: "refresh-token".to_string(),
-                expires: 0,
-            },
-        );
-
-        assert_eq!(
-            store.api_key_for("github-copilot").as_deref(),
-            Some("refresh-token")
-        );
-    }
-
-    #[test]
     fn api_key_for_regular_provider_uses_stored_key() {
         let mut store = AuthStore::default();
         store.credentials.insert(
-            "openrouter".to_string(),
+            "openai".to_string(),
             StoredCredential::ApiKey {
-                key: "or-key".to_string(),
+                key: "oa-key".to_string(),
             },
         );
 
-        assert_eq!(store.api_key_for("openrouter").as_deref(), Some("or-key"));
+        assert_eq!(store.api_key_for("openai").as_deref(), Some("oa-key"));
     }
 
     #[test]

@@ -173,21 +173,9 @@ fn render_provider_setup_page(frame: &mut Frame, area: Rect) {
             Span::styled("  then restart", Style::default().fg(dim)),
         ]),
         Line::from(Span::styled(sep, Style::default().fg(Color::Rgb(45, 45, 55)))),
-        // ── 4. Groq ───────────────────────────────────────────
+        // ── 4. Ollama ─────────────────────────────────────────
         Line::from(vec![
             Span::styled("  4  ", Style::default().fg(pink).add_modifier(Modifier::BOLD)),
-            Span::styled("Groq", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-            Span::styled("  Fast inference · Free tier · groq.com/keys", Style::default().fg(dim)),
-        ]),
-        Line::from(vec![
-            Span::styled("     › ", Style::default().fg(pink)),
-            Span::styled("set GROQ_API_KEY=<key>", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::styled("  then restart", Style::default().fg(dim)),
-        ]),
-        Line::from(Span::styled(sep, Style::default().fg(Color::Rgb(45, 45, 55)))),
-        // ── 5. Ollama ─────────────────────────────────────────
-        Line::from(vec![
-            Span::styled("  5  ", Style::default().fg(pink).add_modifier(Modifier::BOLD)),
             Span::styled("Ollama", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
             Span::styled("  Local models · No key needed", Style::default().fg(dim)),
         ]),
@@ -195,10 +183,21 @@ fn render_provider_setup_page(frame: &mut Frame, area: Rect) {
             Span::styled("     › ", Style::default().fg(pink)),
             Span::styled("claurst --provider ollama", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         ]),
+        Line::from(Span::styled(sep, Style::default().fg(Color::Rgb(45, 45, 55)))),
+        // ── 5. llama.cpp ──────────────────────────────────────
+        Line::from(vec![
+            Span::styled("  5  ", Style::default().fg(pink).add_modifier(Modifier::BOLD)),
+            Span::styled("llama.cpp", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+            Span::styled("  Local inference server · No key needed", Style::default().fg(dim)),
+        ]),
+        Line::from(vec![
+            Span::styled("     › ", Style::default().fg(pink)),
+            Span::styled("claurst --provider llama-cpp", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        ]),
         Line::from(""),
         Line::from(vec![
             Span::styled("  + ", Style::default().fg(Color::Rgb(120, 120, 120))),
-            Span::styled("20+ more providers: ", Style::default().fg(Color::Rgb(120, 120, 120))),
+            Span::styled("more commands and local setup options: ", Style::default().fg(Color::Rgb(120, 120, 120))),
             Span::styled("claurst --help", Style::default().fg(Color::Rgb(150, 150, 150))),
         ]),
         Line::from(""),
