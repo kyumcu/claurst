@@ -123,6 +123,18 @@ Recommended coordination files:
 - `.codex/agents/provider-rollout.md`
 - `.codex/agents/plugins.md`
 
+Tracked `.codex/agents/*.md` files should remain:
+
+- directives
+- templates
+- durable status records
+
+They should not become:
+
+- noisy local logs
+- scratchpads
+- frequently changing personal notes
+
 ## Ownership Guidance
 
 To reduce conflicts, keep branch ownership aligned with module boundaries.

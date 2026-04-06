@@ -1,2 +1,5 @@
 /src-rust/target/
-/.codex/
+/.codex/*
+!/.codex/agents/
+/.codex/agents/*
+!/.codex/agents/*.md

@@ -37,6 +37,18 @@ Recommended layout:
 6. Keep commits small and focused.
 7. Record status in your matching `.codex/agents/<name>.md` file.
 
+Tracked `.codex/agents/*.md` files must stay as:
+
+- directives
+- templates
+- durable status
+
+Do not turn them into:
+
+- noisy local logs
+- ephemeral scratchpads
+- constantly changing personal notes
+
 ## Execution Protocol
 
 Before responding, state the intended end state or user objective in one clear sentence.
@@ -192,6 +204,8 @@ Each `.codex/agents/<name>.md` file should track:
 - files changed
 - tests run
 - last review status
+
+They should capture durable coordination state, not live terminal transcripts or scratch output.
 
 ## Conflict Rule
 
