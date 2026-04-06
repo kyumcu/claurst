@@ -774,8 +774,8 @@ pub async fn run_query_loop(
                 // Explicit non-Anthropic provider in config — use it.
                 // If the stored model is in canonical "provider/model" form,
                 // strip the top-level provider prefix before sending it to the
-                // provider adapter. If it contains an additional slash
-                // (e.g. "meta-llama/Llama-3.3..." on OpenRouter), preserve it.
+                // provider adapter. If it contains an additional slash for a
+                // model namespace, preserve the remainder.
                 let provider_prefix = format!("{}/", p);
                 let model_id = effective_model
                     .strip_prefix(&provider_prefix)
@@ -785,20 +785,19 @@ pub async fn run_query_loop(
             } else if let Some((p, m)) = effective_model.split_once('/') {
                 // No explicit provider but model has "provider/model" format.
                 // Check whether `p` is a known provider or just a model
-                // namespace (e.g. "meta-llama/Llama-3" on OpenRouter).
+                // namespace.
                 let known_providers = [
                     "anthropic",
                     "openai",
                     "google",
                     "ollama",
-                    "lmstudio",
                     "lm-studio",
-                    "llamacpp",
                     "llama-cpp",
                     "openai-codex",
                 ];
-                if known_providers.contains(&p) {
-                    (p.to_string(), m.to_string())
+                let canonical_provider = claurst_core::ProviderId::canonicalize(p);
+                if known_providers.contains(&canonical_provider.as_str()) {
+                    (canonical_provider, m.to_string())
                 } else {
                     // Treat the whole string as the model ID, fall through
                     // to auto-detection below.

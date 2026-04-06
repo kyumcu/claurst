@@ -1344,9 +1344,10 @@ impl App {
 
     fn infer_provider_from_model(model: &str) -> Option<String> {
         if let Some((provider, _)) = model.split_once('/') {
+            let canonical_provider = ProviderId::canonicalize(provider);
             let known = ["anthropic", "openai", "google", "ollama", "lm-studio", "llama-cpp"];
-            if known.contains(&provider) {
-                return Some(ProviderId::canonicalize(provider));
+            if known.contains(&canonical_provider.as_str()) {
+                return Some(canonical_provider);
             }
         }
 

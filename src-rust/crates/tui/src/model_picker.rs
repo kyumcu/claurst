@@ -181,7 +181,9 @@ impl ModelPickerState {
             let provider = if let Some((p, _)) = m.split_once('/') {
                 canonical_provider_id(p)
             } else {
-                // Bare model name — detect provider from model name
+                // Bare model name — infer a likely provider bucket from the
+                // model family. Open-weight local families default to the
+                // llama.cpp bucket until an explicit provider prefix is known.
                 if m.contains("claude") {
                     "anthropic".to_string()
                 } else if m.starts_with("gpt") || m.starts_with("o3") || m.starts_with("o4") {
