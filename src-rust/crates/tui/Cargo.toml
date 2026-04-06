@@ -33,7 +33,6 @@ teammem = ["claurst-core/teammem"]
 
 # Tools & Infrastructure features (pass-through from cc-core)
 bash_classifier = ["claurst-core/bash_classifier"]
-bridge_mode = ["claurst-core/bridge_mode"]
 mcp_rich_output = ["claurst-core/mcp_rich_output"]
 connector_text = ["claurst-core/connector_text"]
 unattended_retry = ["claurst-core/unattended_retry"]

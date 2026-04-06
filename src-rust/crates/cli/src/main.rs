@@ -44,7 +44,7 @@ use claurst_tools::{PermissionLevel, Tool, ToolContext, ToolResult};
 use clap::{ArgAction, Parser, ValueEnum};
 use parking_lot::Mutex as ParkingMutex;
 use std::{path::PathBuf, sync::Arc};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
 // ---------------------------------------------------------------------------
@@ -307,29 +307,6 @@ enum CliInputFormat {
     StreamJson,
 }
 
-fn resolve_bridge_config(
-    settings: &Settings,
-    auth_credential: &str,
-    use_bearer_auth: bool,
-    is_headless: bool,
-) -> Option<claurst_bridge::BridgeConfig> {
-    if is_headless {
-        return None;
-    }
-
-    let mut bridge_config = claurst_bridge::BridgeConfig::from_env();
-
-    if settings.remote_control_at_startup {
-        bridge_config.enabled = true;
-    }
-
-    if bridge_config.session_token.is_none() && use_bearer_auth && !auth_credential.is_empty() {
-        bridge_config.session_token = Some(auth_credential.to_string());
-    }
-
-    bridge_config.is_active().then_some(bridge_config)
-}
-
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -346,11 +323,6 @@ async fn main() -> anyhow::Result<()> {
     // Fast-path: `claude auth <login|logout|status>` — mirrors TypeScript cli.tsx pattern
     if raw_args.get(1).map(|s| s.as_str()) == Some("auth") {
         return handle_auth_command(&raw_args[2..]).await;
-    }
-
-    // Fast-path: `claude acp` — start the Agent Client Protocol stdio server.
-    if raw_args.get(1).map(|s| s.as_str()) == Some("acp") {
-        return claurst_acp::run_acp_server().await;
     }
 
     // Fast-path: `claude models` — list all available providers and models.
@@ -395,7 +367,6 @@ async fn main() -> anyhow::Result<()> {
                     working_dir: cwd,
                     session_id: "pre-session".to_string(),
                     session_title: None,
-                    remote_session_url: None,
                     mcp_manager: None,
                 };
                 // Collect remaining args after the command name
@@ -608,15 +579,6 @@ async fn main() -> anyhow::Result<()> {
     let provider_registry =
         claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config);
 
-    let bridge_config = resolve_bridge_config(&settings, &api_key, use_bearer_auth, is_headless);
-    if let Some(cfg) = bridge_config.as_ref() {
-        info!(
-            server_url = %cfg.server_url,
-            startup_enabled = settings.remote_control_at_startup,
-            "Remote control bridge configured for interactive startup"
-        );
-    }
-
     // Build tools
     // Interactive mode uses InteractivePermissionHandler which allows writes in Default mode
     // (the user is watching the TUI so they can intervene). Headless/print mode uses
@@ -790,7 +752,6 @@ async fn main() -> anyhow::Result<()> {
             query_config,
             cost_tracker,
             cli.resume,
-            bridge_config,
             has_credentials,
             model_registry,
         )
@@ -1269,18 +1230,12 @@ async fn run_interactive(
     query_config: claurst_query::QueryConfig,
     cost_tracker: Arc<CostTracker>,
     resume_id: Option<String>,
-    bridge_config: Option<claurst_bridge::BridgeConfig>,
     has_credentials: bool,
     model_registry: Arc<claurst_api::ModelRegistry>,
 ) -> anyhow::Result<()> {
     use claurst_commands::{execute_command, CommandContext, CommandResult};
-    use claurst_bridge::{BridgeOutbound, TuiBridgeEvent};
     use claurst_query::{QueryEvent, QueryOutcome};
-    use claurst_tui::{
-        bridge_state::BridgeConnectionState, notifications::NotificationKind,
-        render::render_app, restore_terminal, setup_terminal, App,
-        device_auth_dialog::DeviceAuthEvent,
-    };
+    use claurst_tui::{render::render_app, restore_terminal, setup_terminal, App, device_auth_dialog::DeviceAuthEvent};
     use crossterm::event::{self, Event, KeyCode};
     use std::time::Duration;
     use tokio::sync::mpsc;
@@ -1453,64 +1408,6 @@ async fn run_interactive(
         });
     }
 
-    // Bridge runtime channels — Some when bridge is configured and started.
-    //
-    // tui_rx:       TUI-facing events from the bridge worker (connect/disconnect/prompts)
-    // outbound_tx:  Forward query events to the bridge worker for upload to server
-    // bridge_cancel: CancellationToken to stop the bridge worker task
-    struct BridgeRuntime {
-        tui_rx: mpsc::Receiver<TuiBridgeEvent>,
-        outbound_tx: mpsc::Sender<BridgeOutbound>,
-        cancel: CancellationToken,
-    }
-
-    // Preserve the bridge token before consuming bridge_config so we can reconstruct
-    // a BridgeSessionInfo once the bridge worker reports it has connected.
-    let bridge_token: Option<String> = bridge_config
-        .as_ref()
-        .and_then(|c| c.session_token.clone());
-
-    let mut bridge_runtime: Option<BridgeRuntime> = if let Some(cfg) = bridge_config {
-        let bridge_cancel = CancellationToken::new();
-        let (tui_tx, tui_rx) = mpsc::channel::<TuiBridgeEvent>(64);
-        let (outbound_tx, outbound_rx) = mpsc::channel::<BridgeOutbound>(256);
-
-        // Update TUI state to "connecting" before the task starts.
-        app.bridge_state = BridgeConnectionState::Connecting;
-
-        let cancel_clone = bridge_cancel.clone();
-        tokio::spawn(async move {
-            if let Err(e) = claurst_bridge::run_bridge_loop(cfg, tui_tx, outbound_rx, cancel_clone).await {
-                warn!("Bridge loop exited with error: {}", e);
-            }
-        });
-
-        Some(BridgeRuntime {
-            tui_rx,
-            outbound_tx,
-            cancel: bridge_cancel,
-        })
-    } else {
-        None
-    };
-
-    // Relay channels for the BridgeSessionInfo-based event path.
-    //
-    // relay_ev_tx:    receives serialised JSON event payloads from the query-event
-    //                 drain loop; a background task consumes them and calls
-    //                 post_bridge_event so the web UI sees live streaming events.
-    // relay_ev_rx_opt: Option wrapper so we can move the Receiver into the relay
-    //                 task exactly once when the bridge session comes online.
-    // remote_prompt_tx/rx: inbound user messages polled from poll_bridge_messages
-    //                 are delivered here; the main loop injects them as query turns.
-    let (relay_ev_tx, relay_ev_rx) = mpsc::channel::<String>(256);
-    let mut relay_ev_rx_opt: Option<mpsc::Receiver<String>> = Some(relay_ev_rx);
-    let (remote_prompt_tx, mut remote_prompt_rx) = mpsc::channel::<String>(32);
-
-    // Once the bridge worker reports Connected we build this from the session
-    // credentials so both relay tasks can POST/poll the /api/bridge/sessions API.
-    let mut bridge_session_info: Option<std::sync::Arc<claurst_bridge::BridgeSessionInfo>> = None;
-
     let mut messages = initial_messages;
     let mut cmd_ctx = CommandContext {
         config: live_config,
@@ -1519,7 +1416,6 @@ async fn run_interactive(
         working_dir: tool_ctx.working_dir.clone(),
         session_id: session.id.clone(),
         session_title: session.title.clone(),
-        remote_session_url: session.remote_session_url.clone(),
         mcp_manager: tool_ctx.mcp_manager.clone(),
     };
 
@@ -2133,82 +2029,8 @@ async fn run_interactive(
             }
         }
 
-        // Drain query events — also forward relevant ones to the bridge as outbound.
+        // Drain query events.
         while let Ok(evt) = event_rx.try_recv() {
-            // Forward to bridge before consuming (clone only what we need).
-            if let Some(ref runtime) = bridge_runtime {
-                let outbound: Option<BridgeOutbound> = match &evt {
-                    QueryEvent::Stream(claurst_api::AnthropicStreamEvent::ContentBlockDelta {
-                        delta: claurst_api::streaming::ContentDelta::TextDelta { text },
-                        index,
-                        ..
-                    }) => Some(BridgeOutbound::TextDelta {
-                        delta: text.clone(),
-                        message_id: format!("msg-{}", index),
-                    }),
-                    QueryEvent::ToolStart { tool_name, tool_id, input_json } => {
-                        Some(BridgeOutbound::ToolStart {
-                            id: tool_id.clone(),
-                            name: tool_name.clone(),
-                            input_preview: Some(input_json.clone()),
-                        })
-                    }
-                    QueryEvent::ToolEnd { tool_id, result, is_error, .. } => {
-                        Some(BridgeOutbound::ToolEnd {
-                            id: tool_id.clone(),
-                            output: result.clone(),
-                            is_error: *is_error,
-                        })
-                    }
-                    QueryEvent::TurnComplete { stop_reason, turn, .. } => {
-                        Some(BridgeOutbound::TurnComplete {
-                            message_id: format!("turn-{}", turn),
-                            stop_reason: stop_reason.clone(),
-                        })
-                    }
-                    QueryEvent::Error(msg) => Some(BridgeOutbound::Error {
-                        message: msg.clone(),
-                    }),
-                    _ => None,
-                };
-                if let Some(ob) = outbound {
-                    let _ = runtime.outbound_tx.try_send(ob);
-                }
-            }
-            // Also forward to the BridgeSessionInfo relay channel (best-effort).
-            // This drives the post_bridge_event relay task spawned on Connected.
-            if bridge_session_info.is_some() {
-                let relay_payload: Option<String> = match &evt {
-                    QueryEvent::Stream(claurst_api::AnthropicStreamEvent::ContentBlockDelta {
-                        delta: claurst_api::streaming::ContentDelta::TextDelta { text },
-                        ..
-                    }) => Some(serde_json::json!({
-                        "type": "text_chunk",
-                        "text": text,
-                    }).to_string()),
-                    QueryEvent::ToolStart { tool_name, tool_id, input_json } => {
-                        Some(serde_json::json!({
-                            "type": "tool_start",
-                            "tool_name": tool_name,
-                            "tool_id": tool_id,
-                            "input": input_json,
-                        }).to_string())
-                    }
-                    QueryEvent::ToolEnd { tool_name, tool_id, result, is_error } => {
-                        Some(serde_json::json!({
-                            "type": "tool_end",
-                            "tool_name": tool_name,
-                            "tool_id": tool_id,
-                            "result": result,
-                            "is_error": is_error,
-                        }).to_string())
-                    }
-                    _ => None,
-                };
-                if let Some(payload) = relay_payload {
-                    let _ = relay_ev_tx.try_send(payload);
-                }
-            }
             app.handle_query_event(evt);
         }
 
@@ -2270,267 +2092,6 @@ async fn run_interactive(
                     outcome
                 });
                 current_query = Some((handle, msgs_arc));
-            }
-        }
-
-        // Drain TUI-facing bridge events.
-        let mut disconnect_bridge = false;
-        if let Some(runtime) = bridge_runtime.as_mut() {
-            loop {
-                match runtime.tui_rx.try_recv() {
-                    Ok(TuiBridgeEvent::Connected { session_url, session_id: conn_sid }) => {
-                        let short = if session_url.len() > 60 {
-                            format!("{}…", &session_url[..60])
-                        } else {
-                            session_url.clone()
-                        };
-                        app.bridge_state = BridgeConnectionState::Connected {
-                            session_url: session_url.clone(),
-                            peer_count: 0,
-                        };
-                        app.remote_session_url = Some(session_url.clone());
-                        cmd_ctx.remote_session_url = Some(session_url.clone());
-                        app.notifications.push(
-                            NotificationKind::Success,
-                            format!("Remote control active: {}", short),
-                            Some(5),
-                        );
-                        // Persist the session URL into the saved session record.
-                        session.remote_session_url = Some(session_url.clone());
-                        session.updated_at = chrono::Utc::now();
-                        let _ = claurst_core::history::save_session(&session).await;
-
-                        // Wire the BridgeSessionInfo relay so live tool/text events reach
-                        // the web UI via /api/bridge/sessions. This runs alongside
-                        // run_bridge_loop as a best-effort supplementary delivery path.
-                        if let Some(ref token) = bridge_token {
-                            let info = std::sync::Arc::new(claurst_bridge::BridgeSessionInfo {
-                                session_id: conn_sid.clone(),
-                                session_url: session_url.clone(),
-                                token: token.clone(),
-                            });
-                            bridge_session_info = Some(info.clone());
-
-                            // Relay consumer: moves relay_ev_rx (taken from the Option)
-                            // into a background task that calls post_bridge_event per item.
-                            if let Some(rx) = relay_ev_rx_opt.take() {
-                                let info_relay = info.clone();
-                                tokio::spawn(async move {
-                                    let mut rx = rx;
-                                    while let Some(payload) = rx.recv().await {
-                                        let _ = claurst_bridge::post_bridge_event(
-                                            &info_relay,
-                                            payload,
-                                        )
-                                        .await;
-                                    }
-                                });
-                            }
-
-                            // Poll task: periodically calls poll_bridge_messages and
-                            // forwards inbound user messages to remote_prompt_tx.
-                            let info_poll = info.clone();
-                            let poll_tx = remote_prompt_tx.clone();
-                            tokio::spawn(async move {
-                                let mut since_id: Option<String> = None;
-                                loop {
-                                    match claurst_bridge::poll_bridge_messages(
-                                        &info_poll,
-                                        since_id.as_deref(),
-                                    )
-                                    .await
-                                    {
-                                        Ok(msgs) if !msgs.is_empty() => {
-                                            for msg in &msgs {
-                                                since_id = Some(msg.id.clone());
-                                                if msg.role == "user" {
-                                                    if poll_tx
-                                                        .send(msg.content.clone())
-                                                        .await
-                                                        .is_err()
-                                                    {
-                                                        return;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                    tokio::time::sleep(
-                                        std::time::Duration::from_secs(2),
-                                    )
-                                    .await;
-                                }
-                            });
-                        }
-                    }
-                    Ok(TuiBridgeEvent::Disconnected { reason }) => {
-                        app.bridge_state = BridgeConnectionState::Disconnected;
-                        app.remote_session_url = None;
-                        cmd_ctx.remote_session_url = None;
-                        if let Some(r) = reason {
-                            app.notifications.push(
-                                NotificationKind::Warning,
-                                format!("Bridge disconnected: {}", r),
-                                Some(5),
-                            );
-                        }
-                        disconnect_bridge = true;
-                        break;
-                    }
-                    Ok(TuiBridgeEvent::Reconnecting { attempt }) => {
-                        app.bridge_state = BridgeConnectionState::Reconnecting { attempt };
-                    }
-                    Ok(TuiBridgeEvent::InboundPrompt { content, .. }) => {
-                        // Inject the remote prompt as if the user typed it, then
-                        // trigger submission automatically.
-                        app.set_prompt_text(content.clone());
-                        // Push as a user message and fire a query immediately.
-                        messages.push(claurst_core::types::Message::user(content.clone()));
-                        app.push_message(claurst_core::types::Message::user(content.clone()));
-                        session.messages = messages.clone();
-                        session.updated_at = chrono::Utc::now();
-                        app.is_streaming = true;
-                        app.streaming_text.clear();
-                        let ct = CancellationToken::new();
-                        cancel = Some(ct.clone());
-                        let msgs_arc = Arc::new(tokio::sync::Mutex::new(messages.clone()));
-                        let msgs_arc_clone = msgs_arc.clone();
-                        let tools_arc_clone = tools_arc.clone();
-                        let ctx_clone = tool_ctx.clone();
-                        let mut qcfg = base_query_config.clone();
-                        qcfg.model = claurst_api::effective_model_for_config(&cmd_ctx.config, &model_registry);
-                        qcfg.max_tokens = cmd_ctx.config.effective_max_tokens();
-                        let tracker = cost_tracker.clone();
-                        let tx = event_tx.clone();
-                        let client_clone = client.clone();
-                        let handle = tokio::spawn(async move {
-                            let mut msgs = msgs_arc_clone.lock().await.clone();
-                            let outcome = claurst_query::run_query_loop(
-                                client_clone.as_ref(),
-                                &mut msgs,
-                                tools_arc_clone.as_slice(),
-                                &ctx_clone,
-                                &qcfg,
-                                tracker,
-                                Some(tx),
-                                ct,
-                                None,
-                            )
-                            .await;
-                            *msgs_arc_clone.lock().await = msgs;
-                            outcome
-                        });
-                        current_query = Some((handle, msgs_arc));
-                    }
-                    Ok(TuiBridgeEvent::Cancelled) => {
-                        if app.is_streaming {
-                            if let Some(ref ct) = cancel {
-                                ct.cancel();
-                            }
-                            app.is_streaming = false;
-                            app.status_message =
-                                Some("Cancelled by remote control.".to_string());
-                        }
-                    }
-                    Ok(TuiBridgeEvent::PermissionResponse { tool_use_id, response }) => {
-                        // Resolve a pending permission dialog if IDs match.
-                        if let Some(ref pr) = app.permission_request {
-                            if pr.tool_use_id == tool_use_id {
-                                use claurst_bridge::PermissionResponseKind;
-                                let _allow = matches!(
-                                    response,
-                                    PermissionResponseKind::Allow | PermissionResponseKind::AllowSession
-                                );
-                                app.permission_request = None;
-                            }
-                        }
-                    }
-                    Ok(TuiBridgeEvent::SessionNameUpdate { title }) => {
-                        session.title = Some(title.clone());
-                        session.updated_at = chrono::Utc::now();
-                        cmd_ctx.session_title = Some(title.clone());
-                        app.session_title = Some(title);
-                        let _ = claurst_core::history::save_session(&session).await;
-                    }
-                    Ok(TuiBridgeEvent::Error(msg)) => {
-                        app.bridge_state = BridgeConnectionState::Failed {
-                            reason: msg.clone(),
-                        };
-                        app.notifications.push(
-                            NotificationKind::Warning,
-                            format!("Bridge error: {}", msg),
-                            Some(5),
-                        );
-                        disconnect_bridge = true;
-                        break;
-                    }
-                    Ok(TuiBridgeEvent::Ping) => {
-                        // No TUI action needed; pong is handled inside run_bridge_loop.
-                    }
-                    Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
-                    Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
-                        app.bridge_state = BridgeConnectionState::Disconnected;
-                        app.remote_session_url = None;
-                        cmd_ctx.remote_session_url = None;
-                        app.notifications.push(
-                            NotificationKind::Warning,
-                            "Remote control connection lost.".to_string(),
-                            Some(5),
-                        );
-                        disconnect_bridge = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if disconnect_bridge {
-            bridge_runtime = None;
-        }
-
-        // Drain inbound prompts from the BridgeSessionInfo poll task.
-        // These are user messages received from the web UI via poll_bridge_messages
-        // and injected here just like TuiBridgeEvent::InboundPrompt.
-        while let Ok(content) = remote_prompt_rx.try_recv() {
-            if !app.is_streaming {
-                app.set_prompt_text(content.clone());
-                messages.push(claurst_core::types::Message::user(content.clone()));
-                app.push_message(claurst_core::types::Message::user(content.clone()));
-                session.messages = messages.clone();
-                session.updated_at = chrono::Utc::now();
-                app.is_streaming = true;
-                app.streaming_text.clear();
-                let ct = CancellationToken::new();
-                cancel = Some(ct.clone());
-                let msgs_arc = Arc::new(tokio::sync::Mutex::new(messages.clone()));
-                let msgs_arc_clone = msgs_arc.clone();
-                let tools_arc_clone = tools_arc.clone();
-                let ctx_clone = tool_ctx.clone();
-                let mut qcfg = base_query_config.clone();
-                qcfg.model = claurst_api::effective_model_for_config(&cmd_ctx.config, &model_registry);
-                qcfg.max_tokens = cmd_ctx.config.effective_max_tokens();
-                let tracker = cost_tracker.clone();
-                let tx = event_tx.clone();
-                let client_clone = client.clone();
-                let handle = tokio::spawn(async move {
-                    let mut msgs = msgs_arc_clone.lock().await.clone();
-                    let outcome = claurst_query::run_query_loop(
-                        client_clone.as_ref(),
-                        &mut msgs,
-                        tools_arc_clone.as_slice(),
-                        &ctx_clone,
-                        &qcfg,
-                        tracker,
-                        Some(tx),
-                        ct,
-                        None,
-                    )
-                    .await;
-                    *msgs_arc_clone.lock().await = msgs;
-                    outcome
-                });
-                current_query = Some((handle, msgs_arc));
-                break; // process one prompt per frame
             }
         }
 
@@ -2762,9 +2323,6 @@ async fn run_interactive(
         }
     }
 
-    if let Some(runtime) = bridge_runtime.take() {
-        runtime.cancel.cancel();
-    }
     restore_terminal(&mut terminal)?;
     Ok(())
 }

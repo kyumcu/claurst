@@ -9,7 +9,6 @@
 // - Cost/token tracking display
 // - Notification banners
 // - Help, history-search, message-selector, and rewind overlays
-// - Bridge connection status badge
 // - Plugin hint banners
 
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
@@ -49,8 +48,6 @@ pub mod dialogs;
 pub mod notifications;
 /// Help overlay, history search, message selector, rewind flow.
 pub mod overlays;
-/// Bridge connection state and status badge.
-pub mod bridge_state;
 /// Plugin hint/recommendation UI.
 pub mod plugin_views;
 /// Full-screen tabbed settings interface.
@@ -687,11 +684,6 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let mut app = make_app();
         app.away_summary = Some("2 agent updates while you were away".to_string());
-        app.remote_session_url = Some("https://example.com/session/123".to_string());
-        app.bridge_state = crate::bridge_state::BridgeConnectionState::Connected {
-            session_url: "https://example.com/session/123".to_string(),
-            peer_count: 2,
-        };
 
         terminal
             .draw(|frame| crate::render::render_app(frame, &app))

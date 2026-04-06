@@ -25,6 +25,32 @@ impl ProviderId {
         ProviderId(s.into())
     }
 
+    /// Return the canonical provider identifier for a possibly-aliased input.
+    ///
+    /// This keeps provider normalization at the boundary so the rest of the
+    /// codebase can rely on canonical IDs such as `llama-cpp` and
+    /// `lm-studio`.
+    pub fn canonical_str(provider_id: &str) -> &str {
+        match provider_id {
+            "llamacpp" | "llama.cpp" => Self::LLAMA_CPP,
+            "lmstudio" => Self::LM_STUDIO,
+            "togetherai" => Self::TOGETHER_AI,
+            "vultr-ai" => "vultr",
+            other => other,
+        }
+    }
+
+    /// Return a canonicalized owned provider identifier.
+    pub fn canonicalize(provider_id: impl Into<String>) -> String {
+        let provider_id = provider_id.into();
+        let canonical = Self::canonical_str(&provider_id);
+        if canonical == provider_id {
+            provider_id
+        } else {
+            canonical.to_string()
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Well-known provider constants
     // -----------------------------------------------------------------------
@@ -162,5 +188,24 @@ impl PartialEq<str> for ModelId {
 impl PartialEq<&str> for ModelId {
     fn eq(&self, other: &&str) -> bool {
         self.0 == *other
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProviderId;
+
+    #[test]
+    fn canonicalize_aliases_to_canonical_ids() {
+        assert_eq!(ProviderId::canonical_str("llamacpp"), ProviderId::LLAMA_CPP);
+        assert_eq!(ProviderId::canonical_str("llama.cpp"), ProviderId::LLAMA_CPP);
+        assert_eq!(ProviderId::canonical_str("lmstudio"), ProviderId::LM_STUDIO);
+        assert_eq!(ProviderId::canonical_str("togetherai"), ProviderId::TOGETHER_AI);
+    }
+
+    #[test]
+    fn canonicalize_owned_values() {
+        assert_eq!(ProviderId::canonicalize("llamacpp"), ProviderId::LLAMA_CPP);
+        assert_eq!(ProviderId::canonicalize("openai"), "openai");
     }
 }

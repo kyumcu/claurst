@@ -827,8 +827,6 @@ pub mod config {
         pub version: Option<u32>,
         #[serde(default)]
         pub projects: HashMap<String, ProjectSettings>,
-        #[serde(default, rename = "remoteControlAtStartup")]
-        pub remote_control_at_startup: bool,
         /// Persisted permission rules saved by the user across sessions.
         #[serde(default, rename = "permissionRules")]
         pub permission_rules: Vec<crate::permissions::SerializedPermissionRule>,
@@ -952,7 +950,8 @@ pub mod config {
             if let Some(ref m) = self.model {
                 return m;
             }
-            match self.provider.as_deref() {
+            match self.provider.as_deref().map(crate::provider_id::ProviderId::canonical_str) {
+                Some("anthropic") => crate::constants::DEFAULT_MODEL,
                 Some("openai") => "gpt-4o",
                 Some("google") => "gemini-2.5-flash",
                 Some("groq") => "llama-3.3-70b-versatile",
@@ -961,18 +960,18 @@ pub mod config {
                 Some("mistral") => "mistral-large-latest",
                 Some("xai") => "grok-2",
                 Some("openrouter") => "anthropic/claude-sonnet-4",
-                Some("togetherai") | Some("together-ai") => "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                Some("together-ai") => "meta-llama/Llama-3.3-70B-Instruct-Turbo",
                 Some("perplexity") => "sonar-pro",
                 Some("cohere") => "command-r-plus",
                 Some("deepinfra") => "meta-llama/Llama-3.3-70B-Instruct",
                 Some("github-copilot") => "gpt-4o",
                 Some("ollama") => "llama3.2",
-                Some("lmstudio") => "default",
-                Some("llamacpp") | Some("llama-cpp") => "default",
+                Some("lm-studio") => "default",
+                Some("llama-cpp") => "default",
                 Some("azure") => "gpt-4o",
                 Some("amazon-bedrock") => "anthropic.claude-sonnet-4-6-v1",
                 Some("venice") => "llama-3.3-70b",
-                _ => crate::constants::DEFAULT_MODEL, // Anthropic default
+                _ => crate::constants::DEFAULT_MODEL,
             }
         }
 
@@ -1011,11 +1010,55 @@ pub mod config {
                 .filter(|prompt| !prompt.trim().is_empty())
         }
 
-        /// Resolve the API key from the config, then from `ANTHROPIC_API_KEY`.
+        /// Resolve the API key from the config or the active provider's
+        /// credential source.
         pub fn resolve_api_key(&self) -> Option<String> {
-            self.api_key
-                .clone()
-                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
+            if let Some(key) = self.api_key.clone() {
+                return Some(key);
+            }
+
+            let raw_provider = self.provider.as_deref();
+            let provider = raw_provider.map(crate::provider_id::ProviderId::canonical_str);
+
+            match provider {
+                Some(provider) => {
+                    if let Some(pc) = raw_provider
+                        .and_then(|raw| {
+                            self.provider_configs
+                                .get(provider)
+                                .or_else(|| self.provider_configs.get(raw))
+                        })
+                    {
+                        if let Some(key) = pc.api_key.clone() {
+                            return Some(key);
+                        }
+                    }
+
+                    let env_var = match provider {
+                        "anthropic" => "ANTHROPIC_API_KEY",
+                        "openai" => "OPENAI_API_KEY",
+                        "google" => "GOOGLE_API_KEY",
+                        "groq" => "GROQ_API_KEY",
+                        "cerebras" => "CEREBRAS_API_KEY",
+                        "deepseek" => "DEEPSEEK_API_KEY",
+                        "mistral" => "MISTRAL_API_KEY",
+                        "xai" => "XAI_API_KEY",
+                        "openrouter" => "OPENROUTER_API_KEY",
+                        "together-ai" => "TOGETHER_API_KEY",
+                        "perplexity" => "PERPLEXITY_API_KEY",
+                        "cohere" => "COHERE_API_KEY",
+                        "deepinfra" => "DEEPINFRA_API_KEY",
+                        "venice" => "VENICE_API_KEY",
+                        "github-copilot" => "GITHUB_TOKEN",
+                        "azure" => "AZURE_API_KEY",
+                        "huggingface" => "HF_TOKEN",
+                        "nvidia" => "NVIDIA_API_KEY",
+                        _ => return None,
+                    };
+                    std::env::var(env_var).ok().filter(|k| !k.is_empty())
+                }
+                None => std::env::var("ANTHROPIC_API_KEY").ok(),
+            }
         }
 
         /// Async variant: also checks `~/.claurst/oauth_tokens.json`.
@@ -1028,6 +1071,17 @@ pub mod config {
             if let Some(key) = self.resolve_api_key() {
                 return Some((key, false));
             }
+
+            let provider = self
+                .provider
+                .as_deref()
+                .map(crate::provider_id::ProviderId::canonical_str);
+
+            match provider {
+                Some("anthropic") | None => {}
+                _ => return None,
+            }
+
             // Fall back to saved OAuth tokens
             let tokens = crate::oauth::OAuthTokens::load().await?;
 
@@ -1085,8 +1139,25 @@ pub mod config {
             }
         }
 
-        /// Resolve the API base URL, checking `ANTHROPIC_BASE_URL` first.
+        /// Resolve the API base URL, preferring a provider-specific override
+        /// and otherwise falling back to `ANTHROPIC_BASE_URL`.
         pub fn resolve_api_base(&self) -> String {
+            let raw_provider = self.provider.as_deref();
+            let provider = raw_provider.map(crate::provider_id::ProviderId::canonical_str);
+
+            if let Some(provider) = provider {
+                if let Some(base) = raw_provider
+                    .and_then(|raw| {
+                        self.provider_configs
+                            .get(provider)
+                            .or_else(|| self.provider_configs.get(raw))
+                    })
+                    .and_then(|pc| pc.api_base.clone())
+                {
+                    return base;
+                }
+            }
+
             std::env::var("ANTHROPIC_BASE_URL")
                 .unwrap_or_else(|_| crate::constants::ANTHROPIC_API_BASE.to_string())
         }
@@ -1289,7 +1360,6 @@ pub mod config {
                 config: merged_config,
                 version: over.version.or(base.version),
                 projects: merge_map(base.projects, over.projects),
-                remote_control_at_startup: over.remote_control_at_startup || base.remote_control_at_startup,
                 permission_rules: { let mut v = base.permission_rules; v.extend(over.permission_rules); v },
                 enabled_plugins: { let mut s = base.enabled_plugins; s.extend(over.enabled_plugins); s },
                 disabled_plugins: { let mut s = base.disabled_plugins; s.extend(over.disabled_plugins); s },
@@ -1815,8 +1885,7 @@ pub mod permissions {
     // PermissionManager
     // -----------------------------------------------------------------------
 
-    /// Pending permission request waiting for resolution (e.g. from a bridge
-    /// remote peer or the interactive TUI dialog).
+    /// Pending permission request waiting for resolution.
     pub struct PendingPermission {
         pub tool_use_id: String,
         pub created_at: std::time::Instant,
@@ -2027,7 +2096,7 @@ pub mod permissions {
 
         /// Register a pending permission and return a receiver.  The caller
         /// awaits the receiver and gets a `PermissionDecision` when the user
-        /// (or a bridge peer) resolves the request.
+        /// Another actor resolves the request.
         pub fn register_pending(
             &mut self,
             id: String,
@@ -2420,9 +2489,6 @@ pub mod history {
         /// Message index in the parent session at which this branch was created.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub branch_at_message: Option<usize>,
-        /// Remote bridge URL if this session is mirrored to a remote endpoint.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub remote_session_url: Option<String>,
         /// Accumulated USD cost for this session.
         #[serde(default)]
         pub total_cost: f64,
@@ -2454,7 +2520,6 @@ pub mod history {
                 tags: vec![],
                 branch_from: None,
                 branch_at_message: None,
-                remote_session_url: None,
                 total_cost: 0.0,
                 total_tokens: 0,
                 checkpoints: vec![],
@@ -2634,7 +2699,6 @@ pub mod history {
             tags: source.tags.clone(),
             branch_from: Some(source_id.to_string()),
             branch_at_message: Some(clamped_idx),
-            remote_session_url: None,
             total_cost: 0.0,
             total_tokens: 0,
             checkpoints: vec![],

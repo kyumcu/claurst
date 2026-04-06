@@ -138,11 +138,13 @@ impl Tool for GrepTool {
             Err(e) => return ToolResult::error(format!("Invalid input: {}", e)),
         };
 
-        let search_path = params
-            .path
-            .as_ref()
-            .map(|p| ctx.resolve_path(p))
-            .unwrap_or_else(|| ctx.working_dir.clone());
+        let search_path = match params.path.as_ref() {
+            Some(p) => match ctx.resolve_path(p) {
+                Ok(path) => path,
+                Err(e) => return ToolResult::error(e.to_string()),
+            },
+            None => ctx.working_dir.clone(),
+        };
 
         debug!(pattern = %params.pattern, path = %search_path.display(), "Running grep");
 
@@ -212,10 +214,7 @@ impl Tool for GrepTool {
 
             // Type filter
             if !type_exts.is_empty() {
-                let ext = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                 if !type_exts.contains(&ext) {
                     continue;
                 }
@@ -315,7 +314,9 @@ impl GrepTool {
     ) -> ToolResult {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
-            Err(e) => return ToolResult::error(format!("Failed to read {}: {}", path.display(), e)),
+            Err(e) => {
+                return ToolResult::error(format!("Failed to read {}: {}", path.display(), e))
+            }
         };
 
         let lines: Vec<&str> = content.lines().collect();
@@ -328,19 +329,12 @@ impl GrepTool {
         }
 
         if matching_lines.is_empty() {
-            return ToolResult::success(format!(
-                "No matches found in {}",
-                path.display()
-            ));
+            return ToolResult::success(format!("No matches found in {}", path.display()));
         }
 
         match output_mode {
             "files_with_matches" => ToolResult::success(path.display().to_string()),
-            "count" => ToolResult::success(format!(
-                "{}:{}",
-                path.display(),
-                matching_lines.len()
-            )),
+            "count" => ToolResult::success(format!("{}:{}", path.display(), matching_lines.len())),
             _ => {
                 let mut results = Vec::new();
                 for line_idx in &matching_lines {

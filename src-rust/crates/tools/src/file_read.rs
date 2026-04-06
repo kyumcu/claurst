@@ -61,7 +61,10 @@ impl Tool for FileReadTool {
             Err(e) => return ToolResult::error(format!("Invalid input: {}", e)),
         };
 
-        let path = ctx.resolve_path(&params.file_path);
+        let path = match ctx.resolve_path(&params.file_path) {
+            Ok(path) => path,
+            Err(e) => return ToolResult::error(e.to_string()),
+        };
         debug!(path = %path.display(), "Reading file");
 
         // Check if file exists
@@ -115,10 +118,7 @@ impl Tool for FileReadTool {
         };
 
         if content.is_empty() {
-            return ToolResult::success(format!(
-                "[File {} exists but is empty]",
-                path.display()
-            ));
+            return ToolResult::success(format!("[File {} exists but is empty]", path.display()));
         }
 
         let lines: Vec<&str> = content.lines().collect();

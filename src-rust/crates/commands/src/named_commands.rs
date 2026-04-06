@@ -14,7 +14,6 @@
 //!   src/commands/install-github-app/index.ts
 //!   src/commands/desktop/index.ts  (implied by component structure)
 //!   src/commands/mobile/index.ts   (implied by component structure)
-//!   src/commands/remote-setup/index.ts (implied by component structure)
 
 use crate::{CommandContext, CommandResult};
 // `open` crate: used by StickersCommand to launch the browser.
@@ -638,7 +637,7 @@ impl NamedCommand for DesktopCommand {
     fn description(&self) -> &str { "Download and set up Claurst Desktop app" }
     fn usage(&self) -> &str { "claude desktop" }
 
-    fn execute_named(&self, _args: &[&str], ctx: &CommandContext) -> CommandResult {
+    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
         let download_url = "https://claude.ai/download";
@@ -662,25 +661,6 @@ impl NamedCommand for DesktopCommand {
             _ => false,
         };
 
-        // If a remote session is active the user is already bridged — show a
-        // deep link so they can open the current session in Desktop.
-        if let Some(ref session_url) = ctx.remote_session_url {
-            let session_id = session_url.split('/').last().unwrap_or("");
-            let deep_link = format!("claude://session/{}", session_id);
-
-            let mut msg = String::new();
-            msg.push_str("\u{2713} Already connected to Claurst Desktop\n\n");
-            msg.push_str("Your Claurst session is synced with Claurst Desktop.\n\n");
-            msg.push_str(&format!("Open this session in Desktop: {deep_link}\n\n"));
-            if desktop_likely_installed {
-                msg.push_str("Claurst Desktop is installed on this machine.\n");
-                msg.push_str(&format!("Manage your installation: {download_url}"));
-            } else {
-                msg.push_str(&format!("Download / manage Desktop: {download_url}"));
-            }
-            return CommandResult::Message(msg);
-        }
-
         let msg = if os == "macos" {
             if desktop_likely_installed {
                 format!(
@@ -696,7 +676,7 @@ impl NamedCommand for DesktopCommand {
                      Setup instructions:\n\
                      1. Download and install Claurst Desktop for macOS\n\
                      2. Open Claurst Desktop and sign in with the same Anthropic account\n\
-                     3. Claurst will detect the Desktop bridge automatically"
+                     3. Claurst will detect the Claurst Desktop app automatically"
                 )
             }
         } else if os == "windows" {
@@ -715,7 +695,7 @@ impl NamedCommand for DesktopCommand {
                      Setup instructions:\n\
                      1. Download and run the Claurst Desktop installer\n\
                      2. Open Claurst Desktop and sign in with the same Anthropic account\n\
-                     3. Claurst will detect the Desktop bridge automatically"
+                     3. Claurst will detect the Claurst Desktop app automatically"
                 )
             }
         } else {
@@ -800,32 +780,15 @@ impl NamedCommand for MobileCommand {
     fn description(&self) -> &str { "Download the Claurst mobile app" }
     fn usage(&self) -> &str { "claude mobile [ios|android]" }
 
-    fn execute_named(&self, args: &[&str], ctx: &CommandContext) -> CommandResult {
+    fn execute_named(&self, args: &[&str], _ctx: &CommandContext) -> CommandResult {
         let ios_url     = "https://apps.apple.com/app/claude-by-anthropic/id6473753684";
         let android_url = "https://play.google.com/store/apps/details?id=com.anthropic.claude";
         let mobile_url  = "https://claude.ai/mobile";
-
-        let has_session = ctx.remote_session_url.is_some();
-
-        // Build a session URL string upfront (may be empty if no session).
-        let session_qr_url: String = if let Some(ref url) = ctx.remote_session_url {
-            let encoded = urlencoding::encode(url);
-            format!("https://claude.ai/code/mobile?session={}", encoded)
-        } else {
-            String::new()
-        };
 
         // Choose which platform / URL to show the QR for (default: claude.ai/mobile).
         let (platform_label, qr_url): (&str, &str) = match args.first().copied().unwrap_or("") {
             "ios" | "1"         => ("[1] iOS  (selected)", ios_url),
             "android" | "2"     => ("[2] Android  (selected)", android_url),
-            "session" | "3"     => {
-                if has_session {
-                    ("[3] Session  (selected)", session_qr_url.as_str())
-                } else {
-                    ("session link unavailable \u{2014} no active remote session", mobile_url)
-                }
-            }
             _                   => ("both platforms", mobile_url),
         };
 
@@ -834,11 +797,7 @@ impl NamedCommand for MobileCommand {
         let mut out = String::new();
         out.push_str("Scan to download Claurst mobile app\n");
         out.push_str(&format!("Platform: {platform_label}\n\n"));
-        if has_session {
-            out.push_str("  [1] iOS    [2] Android    [3] Session (QR links to active session)\n\n");
-        } else {
-            out.push_str("  [1] iOS    [2] Android\n\n");
-        }
+        out.push_str("  [1] iOS    [2] Android\n\n");
 
         // QR block — indent by 2 spaces
         for line in &qr_lines {
@@ -850,9 +809,6 @@ impl NamedCommand for MobileCommand {
         out.push('\n');
         out.push_str(&format!("  iOS:     {ios_url}\n"));
         out.push_str(&format!("  Android: {android_url}\n"));
-        if has_session {
-            out.push_str(&format!("  Session: {}\n", session_qr_url));
-        }
         out.push('\n');
         out.push_str(&format!("Or visit {mobile_url}"));
 
@@ -881,84 +837,6 @@ impl NamedCommand for InstallGithubAppCommand {
              Docs: https://docs.anthropic.com/claude-code/github-actions"
                 .to_string(),
         )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// remote-setup
-// ---------------------------------------------------------------------------
-
-pub struct RemoteSetupCommand;
-
-impl NamedCommand for RemoteSetupCommand {
-    fn name(&self) -> &str { "remote-setup" }
-    fn description(&self) -> &str { "Check and configure a remote Claurst environment" }
-    fn usage(&self) -> &str { "claude remote-setup" }
-
-    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        let mut steps = Vec::new();
-
-        // Step 1: Check ANTHROPIC_API_KEY
-        let has_api_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
-        steps.push(format!(
-            "{} ANTHROPIC_API_KEY {}",
-            if has_api_key { "\u{2713}" } else { "\u{2717}" },
-            if has_api_key { "is set".to_string() } else { "is NOT set \u{2014} run: export ANTHROPIC_API_KEY=sk-...".to_string() }
-        ));
-
-        // Step 2: Check SSH agent forwarding (check SSH_AUTH_SOCK)
-        let has_ssh_agent = std::env::var("SSH_AUTH_SOCK").is_ok();
-        steps.push(format!(
-            "{} SSH agent forwarding {}",
-            if has_ssh_agent { "\u{2713}" } else { "\u{25cb}" },
-            if has_ssh_agent {
-                "detected".to_string()
-            } else {
-                "not detected (optional \u{2014} needed for git over SSH)".to_string()
-            }
-        ));
-
-        // Step 3: Check claude config dir exists
-        let config_dir = dirs::home_dir().map(|h| h.join(".claurst")).unwrap_or_default();
-        let has_config = config_dir.exists();
-        steps.push(format!(
-            "{} Claurst config dir {}",
-            if has_config { "\u{2713}" } else { "\u{2717}" },
-            if has_config {
-                format!("exists at {}", config_dir.display())
-            } else {
-                "missing \u{2014} run 'claude' once to initialize".to_string()
-            }
-        ));
-
-        // Step 4: Check internet connectivity
-        let net_ok = std::net::TcpStream::connect_timeout(
-            &"api.anthropic.com:443".parse().unwrap_or_else(|_| "8.8.8.8:53".parse().unwrap()),
-            std::time::Duration::from_secs(3),
-        ).is_ok();
-        steps.push(format!(
-            "{} Network connectivity {}",
-            if net_ok { "\u{2713}" } else { "\u{2717}" },
-            if net_ok {
-                "to api.anthropic.com".to_string()
-            } else {
-                "FAILED \u{2014} check firewall/proxy".to_string()
-            }
-        ));
-
-        let all_ok = has_api_key && has_config && net_ok;
-
-        CommandResult::Message(format!(
-            "Remote Setup Checklist\n\n\
-             {}\n\n\
-             {}",
-            steps.join("\n"),
-            if all_ok {
-                "\u{2713} All checks passed. Claurst is ready for remote use.\nStart a session: claude --bridge"
-            } else {
-                "\u{2717} Some checks failed. Fix the issues above and run 'claude remote-setup' again."
-            }
-        ))
     }
 }
 
@@ -1040,7 +918,6 @@ pub fn all_named_commands() -> Vec<Box<dyn NamedCommand>> {
         Box::new(DesktopCommand),
         Box::new(MobileCommand),
         Box::new(InstallGithubAppCommand),
-        Box::new(RemoteSetupCommand),
         Box::new(StickersCommand),
         Box::new(UltraplanCommand),
     ]
@@ -1071,7 +948,6 @@ mod tests {
             working_dir: std::path::PathBuf::from("."),
             session_id: "named-test-session".to_string(),
             session_title: None,
-            remote_session_url: None,
             mcp_manager: None,
         }
     }

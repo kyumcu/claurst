@@ -18,7 +18,7 @@ use tokio::sync::RwLock;
 use tracing::debug;
 
 // ---------------------------------------------------------------------------
-// Session-level state: only one active worktree per session.
+// Session-level state: one active worktree per session.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -29,8 +29,15 @@ pub struct WorktreeSession {
     pub original_head: Option<String>,
 }
 
-static WORKTREE_SESSION: Lazy<Arc<RwLock<Option<WorktreeSession>>>> =
-    Lazy::new(|| Arc::new(RwLock::new(None)));
+static WORKTREE_SESSION: Lazy<dashmap::DashMap<String, Arc<RwLock<Option<WorktreeSession>>>>> =
+    Lazy::new(dashmap::DashMap::new);
+
+fn session_worktree_state(session_id: &str) -> Arc<RwLock<Option<WorktreeSession>>> {
+    WORKTREE_SESSION
+        .entry(session_id.to_string())
+        .or_insert_with(|| Arc::new(RwLock::new(None)))
+        .clone()
+}
 
 // ---------------------------------------------------------------------------
 // EnterWorktreeTool
@@ -55,7 +62,9 @@ struct EnterWorktreeInput {
 
 #[async_trait]
 impl Tool for EnterWorktreeTool {
-    fn name(&self) -> &str { "EnterWorktree" }
+    fn name(&self) -> &str {
+        "EnterWorktree"
+    }
 
     fn description(&self) -> &str {
         "Create a new git worktree and switch the session's working directory to it. \
@@ -64,7 +73,9 @@ impl Tool for EnterWorktreeTool {
          Use ExitWorktree to return to the original directory."
     }
 
-    fn permission_level(&self) -> PermissionLevel { PermissionLevel::Write }
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Write
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -93,8 +104,9 @@ impl Tool for EnterWorktreeTool {
         };
 
         // Check if already in a worktree session
+        let session_state = session_worktree_state(&ctx.session_id);
         {
-            let session = WORKTREE_SESSION.read().await;
+            let session = session_state.read().await;
             if session.is_some() {
                 return ToolResult::error(
                     "Already in a worktree session. Call ExitWorktree first.".to_string(),
@@ -102,11 +114,7 @@ impl Tool for EnterWorktreeTool {
             }
         }
 
-        if let Err(e) = ctx.check_permission(
-            self.name(),
-            "Create a git worktree",
-            false,
-        ) {
+        if let Err(e) = ctx.check_permission(self.name(), "Create a git worktree", false) {
             return ToolResult::error(e.to_string());
         }
 
@@ -128,12 +136,18 @@ impl Tool for EnterWorktreeTool {
             let day_of_year = days % 365;
             let month = day_of_year / 30 + 1;
             let day = day_of_year % 30 + 1;
-            format!("claurst-{:04}{:02}{:02}-{:02}{:02}{:02}", year, month, day, h, m, s)
+            format!(
+                "claurst-{:04}{:02}{:02}-{:02}{:02}{:02}",
+                year, month, day, h, m, s
+            )
         });
 
         // Determine worktree path
         let worktree_path = if let Some(p) = params.path {
-            ctx.working_dir.join(p)
+            match ctx.resolve_path(&p) {
+                Ok(path) => path,
+                Err(e) => return ToolResult::error(e.to_string()),
+            }
         } else {
             ctx.working_dir.join(".worktrees").join(&branch)
         };
@@ -196,7 +210,7 @@ impl Tool for EnterWorktreeTool {
                 );
 
                 // Save session state
-                *WORKTREE_SESSION.write().await = Some(WorktreeSession {
+                *session_state.write().await = Some(WorktreeSession {
                     original_cwd: ctx.working_dir.clone(),
                     worktree_path: worktree_path.clone(),
                     branch: Some(branch.clone()),
@@ -221,15 +235,23 @@ impl Tool for EnterWorktreeTool {
                     match shell_result {
                         Ok(out) if out.status.success() => {
                             let stdout = String::from_utf8_lossy(&out.stdout);
-                            format!("\nPost-create command '{}' completed successfully.{}",
+                            format!(
+                                "\nPost-create command '{}' completed successfully.{}",
                                 cmd,
-                                if stdout.trim().is_empty() { String::new() } else { format!("\nOutput: {}", stdout.trim()) }
+                                if stdout.trim().is_empty() {
+                                    String::new()
+                                } else {
+                                    format!("\nOutput: {}", stdout.trim())
+                                }
                             )
                         }
                         Ok(out) => {
                             let stderr = String::from_utf8_lossy(&out.stderr);
-                            format!("\nPost-create command '{}' exited with error.\nStderr: {}",
-                                cmd, stderr.trim())
+                            format!(
+                                "\nPost-create command '{}' exited with error.\nStderr: {}",
+                                cmd,
+                                stderr.trim()
+                            )
                         }
                         Err(e) => format!("\nCould not run post-create command '{}': {}", cmd, e),
                     }
@@ -273,11 +295,15 @@ struct ExitWorktreeInput {
     discard_changes: bool,
 }
 
-fn default_action() -> String { "keep".to_string() }
+fn default_action() -> String {
+    "keep".to_string()
+}
 
 #[async_trait]
 impl Tool for ExitWorktreeTool {
-    fn name(&self) -> &str { "ExitWorktree" }
+    fn name(&self) -> &str {
+        "ExitWorktree"
+    }
 
     fn description(&self) -> &str {
         "Exit the current worktree session created by EnterWorktree and restore the \
@@ -286,7 +312,9 @@ impl Tool for ExitWorktreeTool {
          by EnterWorktree in this session."
     }
 
-    fn permission_level(&self) -> PermissionLevel { PermissionLevel::Write }
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Write
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -312,7 +340,8 @@ impl Tool for ExitWorktreeTool {
             Err(e) => return ToolResult::error(format!("Invalid input: {}", e)),
         };
 
-        let session_guard = WORKTREE_SESSION.read().await;
+        let session_state = session_worktree_state(&_ctx.session_id);
+        let session_guard = session_state.read().await;
         let session = match &*session_guard {
             Some(s) => s.clone(),
             None => {
@@ -368,7 +397,7 @@ impl Tool for ExitWorktreeTool {
         }
 
         // Clear session state
-        *WORKTREE_SESSION.write().await = None;
+        *session_state.write().await = None;
 
         match params.action.as_str() {
             "keep" => {
@@ -376,7 +405,13 @@ impl Tool for ExitWorktreeTool {
                 // but keep the directory on disk.
                 let _ = run_git(
                     &session.original_cwd,
-                    &["worktree", "lock", "--reason", "kept by ExitWorktree", &worktree_str],
+                    &[
+                        "worktree",
+                        "lock",
+                        "--reason",
+                        "kept by ExitWorktree",
+                        &worktree_str,
+                    ],
                 )
                 .await;
 
@@ -398,11 +433,7 @@ impl Tool for ExitWorktreeTool {
 
                 // Delete the branch if we created it
                 if let Some(ref branch) = session.branch {
-                    let _ = run_git(
-                        &session.original_cwd,
-                        &["branch", "-D", branch],
-                    )
-                    .await;
+                    let _ = run_git(&session.original_cwd, &["branch", "-D", branch]).await;
                 }
 
                 ToolResult::success(format!(
@@ -436,5 +467,29 @@ async fn run_git(cwd: &std::path::Path, args: &[&str]) -> Result<String, String>
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_session_worktree_state_is_keyed_by_session_id() {
+        let session_a = session_worktree_state("session-a");
+        let session_b = session_worktree_state("session-b");
+
+        {
+            let mut guard = session_a.write().await;
+            *guard = Some(WorktreeSession {
+                original_cwd: PathBuf::from("/workspace"),
+                worktree_path: PathBuf::from("/workspace/.worktrees/a"),
+                branch: Some("a".to_string()),
+                original_head: Some("deadbeef".to_string()),
+            });
+        }
+
+        assert!(session_a.read().await.is_some());
+        assert!(session_b.read().await.is_none());
     }
 }

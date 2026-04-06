@@ -56,19 +56,18 @@ impl Tool for GlobTool {
             Err(e) => return ToolResult::error(format!("Invalid input: {}", e)),
         };
 
-        let base_dir = params
-            .path
-            .as_ref()
-            .map(|p| ctx.resolve_path(p))
-            .unwrap_or_else(|| ctx.working_dir.clone());
+        let base_dir = match params.path.as_ref() {
+            Some(p) => match ctx.resolve_path(p) {
+                Ok(path) => path,
+                Err(e) => return ToolResult::error(e.to_string()),
+            },
+            None => ctx.working_dir.clone(),
+        };
 
         debug!(pattern = %params.pattern, dir = %base_dir.display(), "Running glob");
 
         if !base_dir.exists() || !base_dir.is_dir() {
-            return ToolResult::error(format!(
-                "Directory not found: {}",
-                base_dir.display()
-            ));
+            return ToolResult::error(format!("Directory not found: {}", base_dir.display()));
         }
 
         // Build the full glob pattern
