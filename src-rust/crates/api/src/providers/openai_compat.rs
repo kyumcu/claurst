@@ -61,7 +61,7 @@ pub struct ProviderQuirks {
 
     /// Name of the JSON field in the assistant message that carries extended
     /// reasoning / thinking text.  `None` means the provider does not expose
-    /// reasoning output.  Example: `Some("reasoning_content")` for DeepSeek.
+    /// reasoning output.
     pub reasoning_field: Option<String>,
 }
 
@@ -81,7 +81,7 @@ pub struct OpenAiCompatProvider {
 
 impl OpenAiCompatProvider {
     /// Create a new compat provider.  `base_url` should already include any
-    /// path prefix (e.g. `"https://api.groq.com/openai/v1"`).
+    /// path prefix (e.g. `"https://host.example/v1"`).
     pub fn new(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -552,9 +552,9 @@ impl LlmProvider for OpenAiCompatProvider {
                     // per-provider configuration.
                     {
                         const COMMON_REASONING_FIELDS: &[&str] = &[
-                            "reasoning_content",  // DeepSeek
-                            "reasoning_text",     // GitHub Copilot
-                            "reasoning",          // Generic / future
+                            "reasoning_content",
+                            "reasoning_text",
+                            "reasoning",
                         ];
                         let fields_to_check: Vec<&str> = if let Some(ref f) = reasoning_field {
                             // Provider-specific field first, then common ones
@@ -794,8 +794,8 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn mistral_tool_ids_match_opencode_style() {
-        let provider = OpenAiCompatProvider::new("mistral", "Mistral", "https://example.com")
+    fn tool_id_scrubbing_matches_expected_contract() {
+        let provider = OpenAiCompatProvider::new("compat", "Compat", "https://example.com")
             .with_quirks(ProviderQuirks {
                 tool_id_max_len: Some(9),
                 tool_id_alphanumeric_only: true,
