@@ -9,14 +9,9 @@
 //!   src/commands/ide/index.ts
 //!   src/commands/branch/index.ts
 //!   src/commands/tag/index.ts
-//!   src/commands/passes/index.ts
 //!   src/commands/pr_comments/index.ts
-//!   src/commands/install-github-app/index.ts
-//!   src/commands/desktop/index.ts  (implied by component structure)
-//!   src/commands/mobile/index.ts   (implied by component structure)
 
 use crate::{CommandContext, CommandResult};
-// `open` crate: used by StickersCommand to launch the browser.
 
 // ---------------------------------------------------------------------------
 // Trait
@@ -440,28 +435,6 @@ impl NamedCommand for TagCommand {
 }
 
 // ---------------------------------------------------------------------------
-// passes
-// ---------------------------------------------------------------------------
-
-pub struct PassesCommand;
-
-impl NamedCommand for PassesCommand {
-    fn name(&self) -> &str { "passes" }
-    fn description(&self) -> &str { "Share a free week of Claurst with friends" }
-    fn usage(&self) -> &str { "claude passes" }
-
-    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        CommandResult::Message(
-            "Claurst Passes \u{2014} Share Claurst with friends\n\n\
-             Share a free week of Claurst with a friend\n\
-             Visit https://claude.ai/passes to get your referral link\n\
-             Each referral gives your friend 1 week of Claurst Pro"
-                .to_string(),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Helper: process liveness check (used by IdeCommand)
 // ---------------------------------------------------------------------------
 
@@ -626,243 +599,6 @@ impl NamedCommand for PrCommentsCommand {
     }
 }
 
-// ---------------------------------------------------------------------------
-// desktop
-// ---------------------------------------------------------------------------
-
-pub struct DesktopCommand;
-
-impl NamedCommand for DesktopCommand {
-    fn name(&self) -> &str { "desktop" }
-    fn description(&self) -> &str { "Download and set up Claurst Desktop app" }
-    fn usage(&self) -> &str { "claude desktop" }
-
-    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        let os = std::env::consts::OS;
-        let arch = std::env::consts::ARCH;
-        let download_url = "https://claude.ai/download";
-
-        // Detect if Claurst Desktop is likely installed (platform-specific heuristic).
-        let desktop_likely_installed = match os {
-            "macos" => {
-                std::path::Path::new("/Applications/Claude.app").exists()
-                    || std::path::Path::new(&format!(
-                        "{}/Applications/Claude.app",
-                        std::env::var("HOME").unwrap_or_default()
-                    ))
-                    .exists()
-            }
-            "windows" => {
-                std::env::var("LOCALAPPDATA")
-                    .map(|p| std::path::Path::new(&p).join("Programs/Claude/Claude.exe").exists())
-                    .unwrap_or(false)
-                    || std::path::Path::new("C:\\Program Files\\Claude\\Claude.exe").exists()
-            }
-            _ => false,
-        };
-
-        let msg = if os == "macos" {
-            if desktop_likely_installed {
-                format!(
-                    "Open Claurst Desktop \u{2014} macOS\n\n\
-                     Claurst Desktop appears to be installed.\n\
-                     Launch it from /Applications/Claude.app and sign in with your Anthropic account.\n\n\
-                     Download / update: {download_url}"
-                )
-            } else {
-                format!(
-                    "Download Claurst Desktop \u{2014} macOS\n\n\
-                     Download: {download_url}\n\n\
-                     Setup instructions:\n\
-                     1. Download and install Claurst Desktop for macOS\n\
-                     2. Open Claurst Desktop and sign in with the same Anthropic account\n\
-                     3. Claurst will detect the Claurst Desktop app automatically"
-                )
-            }
-        } else if os == "windows" {
-            let arch_note = if arch == "x86_64" { " (x64)" } else { "" };
-            if desktop_likely_installed {
-                format!(
-                    "Open Claurst Desktop \u{2014} Windows{arch_note}\n\n\
-                     Claurst Desktop appears to be installed.\n\
-                     Launch it from your Start menu and sign in with your Anthropic account.\n\n\
-                     Download / update: {download_url}"
-                )
-            } else {
-                format!(
-                    "Download Claurst Desktop for Windows{arch_note}\n\n\
-                     Download: {download_url}\n\n\
-                     Setup instructions:\n\
-                     1. Download and run the Claurst Desktop installer\n\
-                     2. Open Claurst Desktop and sign in with the same Anthropic account\n\
-                     3. Claurst will detect the Claurst Desktop app automatically"
-                )
-            }
-        } else {
-            // Linux and other platforms
-            format!(
-                "Claurst Desktop is not yet available for {os}\n\n\
-                 On Linux, you can use Claurst via the CLI or visit https://claude.ai in your browser.\n\
-                 Check {download_url} for the latest platform availability."
-            )
-        };
-
-        CommandResult::Message(msg)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// mobile — helper
-// ---------------------------------------------------------------------------
-
-/// Render a URL as a real QR code using Unicode half-block characters.
-///
-/// Uses the `qrcode` crate to encode the URL, then converts the bit matrix
-/// to lines of "▀" / "▄" / "█" / " " so that two QR rows are packed into
-/// one terminal line (each cell is rendered as a half-block character).
-/// This matches the approach used by many CLI QR renderers and fits in ~40
-/// terminal columns for typical short URLs.
-pub fn render_qr(url: &str) -> Vec<String> {
-    use qrcode::{EcLevel, QrCode};
-
-    let code = match QrCode::with_error_correction_level(url.as_bytes(), EcLevel::L) {
-        Ok(c) => c,
-        Err(_) => return vec!["[QR generation failed]".to_string()],
-    };
-
-    let matrix = code.to_colors();
-    let width = code.width();
-
-    // Add a 2-module quiet zone on each side (QR spec requires ≥4, but 2 renders fine).
-    let qz = 2usize;
-    let padded_width = width + qz * 2;
-
-    // Helper: return true if module at (row, col) is dark, treating the quiet zone as light.
-    let dark = |row: isize, col: isize| -> bool {
-        if row < 0 || col < 0 || row >= width as isize || col >= width as isize {
-            return false;
-        }
-        matrix[row as usize * width + col as usize] == qrcode::Color::Dark
-    };
-
-    let mut lines = Vec::new();
-    // Iterate two matrix rows per terminal line.
-    let total_rows = (width + qz * 2) as isize;
-    let mut r: isize = -(qz as isize);
-    while r < (width + qz) as isize {
-        let mut line = String::new();
-        for c in -(qz as isize)..(width + qz) as isize {
-            let top  = dark(r,     c);
-            let bot  = dark(r + 1, c);
-            line.push(match (top, bot) {
-                (true,  true)  => '█',
-                (true,  false) => '▀',
-                (false, true)  => '▄',
-                (false, false) => ' ',
-            });
-        }
-        lines.push(line);
-        r += 2;
-    }
-    let _ = padded_width; // suppress unused warning
-    let _ = total_rows;
-    lines
-}
-
-// ---------------------------------------------------------------------------
-// mobile
-// ---------------------------------------------------------------------------
-
-pub struct MobileCommand;
-
-impl NamedCommand for MobileCommand {
-    fn name(&self) -> &str { "mobile" }
-    fn description(&self) -> &str { "Download the Claurst mobile app" }
-    fn usage(&self) -> &str { "claude mobile [ios|android]" }
-
-    fn execute_named(&self, args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        let ios_url     = "https://apps.apple.com/app/claude-by-anthropic/id6473753684";
-        let android_url = "https://play.google.com/store/apps/details?id=com.anthropic.claude";
-        let mobile_url  = "https://claude.ai/mobile";
-
-        // Choose which platform / URL to show the QR for (default: claude.ai/mobile).
-        let (platform_label, qr_url): (&str, &str) = match args.first().copied().unwrap_or("") {
-            "ios" | "1"         => ("[1] iOS  (selected)", ios_url),
-            "android" | "2"     => ("[2] Android  (selected)", android_url),
-            _                   => ("both platforms", mobile_url),
-        };
-
-        let qr_lines = render_qr(qr_url);
-
-        let mut out = String::new();
-        out.push_str("Scan to download Claurst mobile app\n");
-        out.push_str(&format!("Platform: {platform_label}\n\n"));
-        out.push_str("  [1] iOS    [2] Android\n\n");
-
-        // QR block — indent by 2 spaces
-        for line in &qr_lines {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push('\n');
-        }
-
-        out.push('\n');
-        out.push_str(&format!("  iOS:     {ios_url}\n"));
-        out.push_str(&format!("  Android: {android_url}\n"));
-        out.push('\n');
-        out.push_str(&format!("Or visit {mobile_url}"));
-
-        CommandResult::Message(out)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// install-github-app
-// ---------------------------------------------------------------------------
-
-pub struct InstallGithubAppCommand;
-
-impl NamedCommand for InstallGithubAppCommand {
-    fn name(&self) -> &str { "install-github-app" }
-    fn description(&self) -> &str { "Set up Claurst GitHub Actions for a repository" }
-    fn usage(&self) -> &str { "claude install-github-app" }
-
-    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        CommandResult::Message(
-            "To install the Claurst GitHub App:\n\
-             1. Visit https://github.com/apps/claude-code-app and click Install\n\
-             2. Select the repositories to enable\n\
-             3. Add your ANTHROPIC_API_KEY to repository secrets\n\n\
-             The app enables Claurst in GitHub Actions workflows.\n\
-             Docs: https://docs.anthropic.com/claude-code/github-actions"
-                .to_string(),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// stickers
-// ---------------------------------------------------------------------------
-
-pub struct StickersCommand;
-
-impl NamedCommand for StickersCommand {
-    fn name(&self) -> &str { "stickers" }
-    fn description(&self) -> &str { "Open the Claurst sticker page in your browser" }
-    fn usage(&self) -> &str { "claude stickers" }
-
-    fn execute_named(&self, _args: &[&str], _ctx: &CommandContext) -> CommandResult {
-        let url = "https://www.stickermule.com/claudecode";
-        match open::that(url) {
-            Ok(_) => CommandResult::Message(format!("Opening stickers page: {url}")),
-            Err(e) => CommandResult::Message(format!(
-                "Visit: {url}\n(Could not open browser: {e})"
-            )),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // ultraplan — Agentic planning with extended thinking
 // ---------------------------------------------------------------------------
 
@@ -912,13 +648,8 @@ pub fn all_named_commands() -> Vec<Box<dyn NamedCommand>> {
         Box::new(AddDirCommand),
         Box::new(BranchCommand),
         Box::new(TagCommand),
-        Box::new(PassesCommand),
         Box::new(IdeCommand),
         Box::new(PrCommentsCommand),
-        Box::new(DesktopCommand),
-        Box::new(MobileCommand),
-        Box::new(InstallGithubAppCommand),
-        Box::new(StickersCommand),
         Box::new(UltraplanCommand),
     ]
 }
@@ -974,7 +705,6 @@ mod tests {
         assert!(find_named_command("agents").is_some());
         assert!(find_named_command("ide").is_some());
         assert!(find_named_command("branch").is_some());
-        assert!(find_named_command("passes").is_some());
     }
 
     #[test]
@@ -1032,7 +762,6 @@ mod tests {
 
     #[test]
     fn test_branch_create_no_session_returns_error() {
-        let ctx = make_ctx(); // session_id = "named-test-session" — no saved session
         let cmd = BranchCommand;
         // Calling create on a session that isn't "pre-session" but also doesn't exist
         // on disk: we can't call block_in_place outside a tokio runtime in a sync test,
@@ -1068,11 +797,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_install_github_app_returns_message() {
-        let ctx = make_ctx();
-        let cmd = InstallGithubAppCommand;
-        let result = cmd.execute_named(&[], &ctx);
-        assert!(matches!(result, CommandResult::Message(_)));
-    }
 }

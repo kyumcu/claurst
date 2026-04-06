@@ -396,8 +396,7 @@ fn command_category(name: &str) -> &'static str {
         "session" | "resume" | "share" | "teleport" => "Sessions & Remote",
         "help" | "exit" | "feedback" | "bug" => "General",
         "think-back" | "thinkback-play" | "thinking" | "plan" | "tasks" => "AI & Thinking",
-        "copy" | "skills" | "agents" | "plugin"
-        | "stickers" | "passes" | "desktop" | "mobile" | "btw" => "Tools & Extras",
+        "copy" | "skills" | "agents" | "plugin" | "btw" => "Tools & Extras",
         _ => "Other",
     }
 }
@@ -2663,8 +2662,7 @@ impl SlashCommand for McpCommand {
            /mcp prompts [server]       — list prompt templates from connected servers\n\
            /mcp get-prompt <server> <prompt> [key=value ...]  — expand a prompt template\n\n\
          To add/remove MCP servers, edit ~/.claurst/settings.json\n\
-         under the 'mcpServers' key.\n\
-         Docs: https://docs.anthropic.com/claude-code/mcp"
+         under the 'mcpServers' key."
     }
 
     async fn execute(&self, args: &str, ctx: &mut CommandContext) -> CommandResult {
@@ -2738,7 +2736,7 @@ impl SlashCommand for McpCommand {
                      }\n\
                    ]\n\
                  }\n\n\
-                 Docs: https://docs.anthropic.com/claude-code/mcp"
+                 Use /mcp auth <server> for OAuth-enabled remote servers."
                     .to_string(),
             );
         }
@@ -7434,13 +7432,6 @@ pub fn all_commands() -> Vec<Box<dyn SlashCommand>> {
             slash_help: "Usage: /tag [list|add|remove] [tag]",
         }),
         Box::new(NamedCommandAdapter {
-            slash_name: "passes",
-            target_name: "passes",
-            slash_aliases: &[],
-            slash_description: "Share a free week of Claurst with friends",
-            slash_help: "Usage: /passes",
-        }),
-        Box::new(NamedCommandAdapter {
             slash_name: "ide",
             target_name: "ide",
             slash_aliases: &[],
@@ -7453,34 +7444,6 @@ pub fn all_commands() -> Vec<Box<dyn SlashCommand>> {
             slash_aliases: &[],
             slash_description: "Get comments from a GitHub pull request",
             slash_help: "Usage: /pr-comments <PR-number>",
-        }),
-        Box::new(NamedCommandAdapter {
-            slash_name: "desktop",
-            target_name: "desktop",
-            slash_aliases: &[],
-            slash_description: "Open the Claurst desktop app",
-            slash_help: "Usage: /desktop",
-        }),
-        Box::new(NamedCommandAdapter {
-            slash_name: "mobile",
-            target_name: "mobile",
-            slash_aliases: &[],
-            slash_description: "Set up Claurst on mobile",
-            slash_help: "Usage: /mobile",
-        }),
-        Box::new(NamedCommandAdapter {
-            slash_name: "install-github-app",
-            target_name: "install-github-app",
-            slash_aliases: &[],
-            slash_description: "Set up Claurst GitHub Actions for a repository",
-            slash_help: "Usage: /install-github-app",
-        }),
-        Box::new(NamedCommandAdapter {
-            slash_name: "stickers",
-            target_name: "stickers",
-            slash_aliases: &[],
-            slash_description: "View collected stickers",
-            slash_help: "Usage: /stickers",
         }),
         Box::new(ContextCommand),
         Box::new(CopyCommand),
@@ -7779,9 +7742,7 @@ mod tests {
             "config", "version", "status", "diff", "memory", "hooks",
             "permissions", "plan", "tasks", "session", "login", "logout", "refresh",
             "feedback", "usage", "plugin",
-            "add-dir", "agents", "branch", "tag",
-            "passes", "ide", "pr-comments", "desktop", "mobile",
-            "install-github-app", "stickers",
+            "add-dir", "agents", "branch", "tag", "ide", "pr-comments",
         ];
         for name in &expected {
             assert!(

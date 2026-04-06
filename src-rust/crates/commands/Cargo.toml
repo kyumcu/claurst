@@ -28,7 +28,6 @@ reqwest = { workspace = true }
 arboard = { version = "3", default-features = false }
 urlencoding = { workspace = true }
 open = { workspace = true }
-qrcode = { workspace = true }
 hostname = "0.4"
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 futures = { workspace = true }

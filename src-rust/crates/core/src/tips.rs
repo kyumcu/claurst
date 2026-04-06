@@ -147,11 +147,6 @@ static ALL_TIPS: Lazy<Vec<Tip>> = Lazy::new(|| {
             cooldown_sessions: 10,
         },
         Tip {
-            id: "install-github-app",
-            content: "Run /install-github-app to tag @claude right from your Github issues and PRs",
-            cooldown_sessions: 10,
-        },
-        Tip {
             id: "web-app",
             content: "Run tasks in the cloud while you keep coding locally · clau.de/web",
             cooldown_sessions: 15,

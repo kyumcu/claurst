@@ -1,13 +1,7 @@
 // cc-mcp: Official MCP server registry.
 //
-// Mirrors the TS officialRegistry.ts, but instead of fetching the live
-// Anthropic registry at runtime (which requires network access and an API key),
-// we maintain a static list of well-known MCP servers.  The live-registry URL
-// check from TS is replicated by `is_official_mcp_url`, which performs a
-// lazy HTTP fetch and caches the result.
-
-use once_cell::sync::OnceCell;
-use std::collections::HashSet;
+// Claurst ships a static list of well-known MCP servers. This keeps the MCP
+// surface deterministic and avoids product-specific remote registry lookups.
 
 // ---------------------------------------------------------------------------
 // Static registry
@@ -154,91 +148,6 @@ pub fn find_server(name: &str) -> Option<&'static OfficialMcpServer> {
     OFFICIAL_SERVERS.iter().find(|s| s.name == name)
 }
 
-// ---------------------------------------------------------------------------
-// Live-registry URL check (mirrors TS isOfficialMcpUrl / prefetchOfficialMcpUrls)
-// ---------------------------------------------------------------------------
-
-/// Cached set of normalized URLs fetched from the Anthropic MCP registry.
-/// `None` means the fetch has not been attempted yet or was disabled.
-static OFFICIAL_URLS: OnceCell<HashSet<String>> = OnceCell::new();
-
-/// Normalize a URL: strip query-string and trailing slash.
-fn normalize_url(url: &str) -> Option<String> {
-    let mut u = url::Url::parse(url).ok()?;
-    u.set_query(None);
-    u.set_fragment(None);
-    let s = u.to_string();
-    Some(s.trim_end_matches('/').to_string())
-}
-
-/// Fire-and-forget fetch of `https://api.anthropic.com/mcp-registry/v0/servers`.
-/// Populates `OFFICIAL_URLS` so that `is_official_mcp_url` works.
-///
-/// Skipped when `CLAURST_DISABLE_NONESSENTIAL_TRAFFIC` is set.
-pub async fn prefetch_official_mcp_urls() {
-    if std::env::var("CLAURST_DISABLE_NONESSENTIAL_TRAFFIC").is_ok() {
-        return;
-    }
-
-    // Only fetch once.
-    if OFFICIAL_URLS.get().is_some() {
-        return;
-    }
-
-    let result: anyhow::Result<HashSet<String>> = async {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()?;
-        let resp: serde_json::Value = client
-            .get("https://api.anthropic.com/mcp-registry/v0/servers?version=latest&visibility=commercial")
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        let mut urls = HashSet::new();
-        if let Some(servers) = resp.get("servers").and_then(|s| s.as_array()) {
-            for entry in servers {
-                if let Some(remotes) = entry
-                    .get("server")
-                    .and_then(|s| s.get("remotes"))
-                    .and_then(|r| r.as_array())
-                {
-                    for remote in remotes {
-                        if let Some(url) = remote.get("url").and_then(|u| u.as_str()) {
-                            if let Some(normalized) = normalize_url(url) {
-                                urls.insert(normalized);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(urls)
-    }
-    .await;
-
-    match result {
-        Ok(urls) => {
-            let count = urls.len();
-            let _ = OFFICIAL_URLS.set(urls);
-            tracing::debug!(count, "[mcp-registry] Loaded official MCP URLs");
-        }
-        Err(e) => {
-            tracing::debug!(error = %e, "[mcp-registry] Failed to fetch MCP registry");
-        }
-    }
-}
-
-/// Returns `true` iff `normalized_url` appears in the official registry.
-/// Returns `false` when the registry has not been fetched yet (fail-closed).
-pub fn is_official_mcp_url(normalized_url: &str) -> bool {
-    OFFICIAL_URLS
-        .get()
-        .map(|set| set.contains(normalized_url))
-        .unwrap_or(false)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,11 +172,5 @@ mod tests {
         let results = search_registry("github");
         assert!(!results.is_empty());
         assert_eq!(results[0].name, "github");
-    }
-
-    #[test]
-    fn test_normalize_url() {
-        let n = normalize_url("https://example.com/path?q=1#frag").unwrap();
-        assert_eq!(n, "https://example.com/path");
     }
 }
