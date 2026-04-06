@@ -60,7 +60,8 @@ That means:
 - Anthropic should not be the implied provider in control flow unless explicitly selected
 - Anthropic model families should not define the default model behavior for unrelated providers
 - UI, onboarding, and command surfaces should not present Anthropic as the assumed main path
-- internal abstractions should be provider-neutral wherever practical
+- shared runtime behavior should be provider-neutral
+- deeper internal abstractions should be made provider-neutral where that materially improves the core path
 
 ### 2. Correctness before breadth
 
@@ -80,7 +81,7 @@ Over:
 
 ### 3. Runtime truth over surface polish
 
-Commands, TUI, ACP, MCP, and bridge surfaces must reflect actual runtime behavior.
+Commands, TUI, and MCP surfaces must reflect actual runtime behavior.
 
 The system should not:
 
@@ -110,6 +111,16 @@ Inside the system:
 - default model logic should be canonical
 - base URL resolution should be canonical
 - UI and commands should not persist aliases
+
+### 5a. Behaviorally provider-neutral, internally transitional
+
+The app should behave as if no provider is privileged, even if some internal Anthropic-shaped types remain temporarily during the refactor.
+
+This means:
+
+- provider-neutral behavior is mandatory in shared runtime paths
+- Anthropic-shaped internal types are acceptable only where they no longer distort product behavior
+- deeper generic abstraction should be introduced when it simplifies the shared runtime, not just for naming purity
 
 ### 6. Explicit failure over silent corruption
 
@@ -203,9 +214,9 @@ These may remain, but they should not complicate the core path and should be red
 - `mcp`
 - `plugins`
 
-### Optional
+### Removal targets
 
-These should be treated as removable, disableable, or explicitly out of the main quality target unless they are strategically required:
+These should be removed from the codebase rather than maintained as optional surfaces:
 
 - `bridge`
 - `acp`
@@ -217,8 +228,8 @@ The codebase should be made leaner by:
 
 - removing duplicate provider logic in favor of one canonical provider system
 - shrinking partially implemented integration surfaces to the features they truly support
-- treating remote-control and peripheral features as optional until the local core is solid
-- preferring removal or disablement over carrying misleading half-implemented behavior
+- removing non-core subsystems that do not strengthen the local-first workflow
+- preferring removal over carrying misleading half-implemented behavior
 
 ## Keep / Shrink / Defer Guidance
 
@@ -230,6 +241,7 @@ The codebase should be made leaner by:
 - canonical provider handling
 - the small control surface around `/connect`, `/model`, `/providers`, `/status`, and `/config`
 - provider-neutral runtime abstractions
+- behaviorally provider-neutral shared runtime
 
 ### Shrink aggressively
 
@@ -238,12 +250,16 @@ The codebase should be made leaner by:
 - plugin reload and marketplace complexity unless it is made trustworthy
 - MCP breadth beyond the transport and routing modes actually used
 - command and reporting surfaces that claim more than they can verify live
+- abstraction cleanup done only for naming purity without improving the core local-first path
 
-### Defer or make optional
+### Remove from scope
 
-- remote bridge sophistication
-- ACP session workflows unless they are made real
+- remote bridge functionality
+- ACP session and editor-integration surface
 - peripheral subsystems like `buddy`
+
+### Defer
+
 - feature breadth for many remote providers before `llama.cpp` is excellent
 
 ## Target Architecture
@@ -267,9 +283,6 @@ Everything else should be secondary to this path:
 
 - `mcp`
 - `plugins`
-- `bridge`
-- `acp`
-- `buddy`
 
 ## Refactor Priorities Implied By This Vision
 
@@ -278,7 +291,7 @@ Everything else should be secondary to this path:
 - prevent conversation loss
 - prevent fake successful turns
 - enforce filesystem boundaries
-- fix bridge event loss and reconnect behavior
+- remove `bridge` after extracting any required migration or replacement steps
 
 ### Priority 2: provider coherence
 
@@ -287,6 +300,7 @@ Everything else should be secondary to this path:
 - synchronized provider/model state
 - reliable `llama.cpp` local flow
 - remove Anthropic as the implicit default path in config, onboarding, and runtime selection
+- make shared runtime behavior provider-neutral before attempting total internal type cleanup
 
 ### Priority 3: truthful interfaces
 
@@ -301,9 +315,14 @@ Everything else should be secondary to this path:
 - stale label cleanup
 - peripheral persistence hardening
 
+### Priority 4a: selective abstraction cleanup
+
+- replace Anthropic-shaped shared abstractions only where they actively distort shared runtime behavior
+- defer purely cosmetic renaming of internal types until after the behavioral refactor succeeds
+
 ### Priority 5: reduce unnecessary surface area
 
-- simplify or disable optional modules that are not part of the local-first core
+- remove `bridge`, `acp`, and `buddy`
 - remove misleading compatibility and reporting layers
 - cut breadth that does not raise the quality of the basic workflow
 
@@ -315,9 +334,10 @@ The codebase is meaningfully aligned with this vision when:
 2. No core runtime path can silently destroy or corrupt conversation state.
 3. No tool can mutate files outside approved roots.
 4. Anthropic support exists only as an explicit provider choice, not as the hidden default identity of the app.
-5. Provider identity is canonical across config, auth, UI, runtime, and commands.
-6. Commands and external interfaces report actual runtime truth.
-7. The supported feature set is smaller, clearer, and more reliable than before.
+5. `bridge`, `acp`, and `buddy` are no longer on the critical path and are removed from the maintained product surface.
+6. Provider identity is canonical across config, auth, UI, runtime, and commands.
+7. Commands and external interfaces report actual runtime truth.
+8. The supported feature set is smaller, clearer, and more reliable than before.
 
 ## Practical Decision Rule
 
@@ -332,3 +352,9 @@ Second question:
 Does this keep Anthropic as an optional provider without forcing Anthropic assumptions into unrelated code paths?
 
 If not, it should be redesigned or reduced.
+
+Third question:
+
+Does making this abstraction more generic improve shared runtime behavior, or is it only improving naming aesthetics?
+
+If it is only aesthetics, defer it.

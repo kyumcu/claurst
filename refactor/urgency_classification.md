@@ -115,9 +115,9 @@ Separate from provider canonicalization, the codebase still treats Anthropic as 
 
 The highest-risk operational issues are in `query`, `tools`, and `bridge`. Those should be treated as the first stabilization wave before doing lower-risk cleanup.
 
-### Optional-surface complexity is the main code-size pressure
+### Non-core subsystem complexity is the main code-size pressure
 
-The biggest non-core complexity comes from `acp`, `bridge`, `mcp`, `plugins`, and `buddy`. These modules are not equally valuable to the local `llama.cpp` workflow, so they should not all be expanded by default. For these areas, shrinking scope is often better than implementing every advertised path.
+The biggest non-core complexity comes from `acp`, `bridge`, `mcp`, `plugins`, and `buddy`. These modules are not equally valuable to the local `llama.cpp` workflow. `acp`, `bridge`, and `buddy` are now explicit removal targets rather than optional expansion areas.
 
 ## Leaning Guidance By Module Group
 
@@ -140,13 +140,13 @@ These modules define the trustworthy local-first path and should be improved, no
 
 These should be kept only within honest, reliable scope. Their complexity should be capped until the core path is stable.
 
-### Reduce, isolate, or make optional
+### Remove
 
 - `acp`
 - `bridge`
 - `buddy`
 
-These have the weakest connection to the lean local-first core. They should be minimized, made optional, or explicitly deprioritized unless they are a strategic product requirement.
+These have the weakest connection to the lean local-first core and are now explicit removal targets.
 
 ## Recommended Urgency Order
 
@@ -164,16 +164,16 @@ If the goal is to reduce the most real risk quickly, the first wave should be:
 1. [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md): compaction data loss.
 2. [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md): stream errors becoming fake successful turns.
 3. [tools_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tools_review.md): filesystem path-boundary enforcement.
-4. [bridge_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/bridge_review.md): outbound event loss and missing outer reconnect.
+4. [bridge_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/bridge_review.md): contain bridge risk only as needed for clean removal.
 5. [core_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/core_review.md), [api_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/api_review.md), [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md), [tui_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tui_review.md), [commands_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/commands_review.md), [cli_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/cli_review.md): unify provider canonicalization and provider-aware config resolution as a coordinated sweep.
 6. [core_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/core_review.md), [api_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/api_review.md), [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md), [tui_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tui_review.md), [commands_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/commands_review.md), [cli_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/cli_review.md): remove Anthropic-first defaults and make `llama.cpp` the explicit first-class path.
 
 ## Practical Reduction Candidates
 
-If the aim is to reduce code and maintenance load, the strongest candidates are:
+If the aim is to reduce code and maintenance load, the strongest removal targets are:
 
-- `acp`: reduce to a minimal honest surface unless real editor-session support is required.
-- `bridge`: keep only if remote/web control is a real product need.
-- `buddy`: isolate as optional or remove from the core refactor path.
+- `acp`: remove instead of implementing a larger session surface.
+- `bridge`: remove instead of deepening remote-control complexity.
+- `buddy`: remove instead of carrying a peripheral subsystem on the core product path.
 - `plugins`: cap scope at reliable loading and runtime truth; defer marketplace sophistication.
 - `mcp`: support only the transports and routing modes that are truly needed.
