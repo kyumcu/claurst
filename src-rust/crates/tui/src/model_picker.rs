@@ -151,6 +151,22 @@ pub struct ProviderSection {
     pub models: Vec<String>, // model ID strings in "provider/model" format
 }
 
+fn canonical_provider_id(provider: &str) -> String {
+    claurst_core::ProviderId::canonicalize(provider)
+}
+
+fn provider_display_name(provider: &str) -> String {
+    match provider {
+        "llama-cpp" => "LLAMA.CPP (local)".to_string(),
+        "lm-studio" => "LM STUDIO (local)".to_string(),
+        "ollama" => "OLLAMA (local)".to_string(),
+        "anthropic" => "ANTHROPIC".to_string(),
+        "openai" => "OPENAI".to_string(),
+        "google" => "GOOGLE".to_string(),
+        _ => provider.to_uppercase(),
+    }
+}
+
 impl ModelPickerState {
     /// Build grouped model sections from a flat list of model strings.
     ///
@@ -163,13 +179,15 @@ impl ModelPickerState {
 
         for m in models {
             let provider = if let Some((p, _)) = m.split_once('/') {
-                p.to_string()
+                canonical_provider_id(p)
             } else {
                 // Bare model name — detect provider from model name
                 if m.contains("claude") {
                     "anthropic".to_string()
                 } else if m.starts_with("gpt") || m.starts_with("o3") || m.starts_with("o4") {
                     "openai".to_string()
+                } else if m.contains("llama") || m.contains("gemma") || m.contains("qwen") {
+                    "llama-cpp".to_string()
                 } else if m.contains("gemini") {
                     "google".to_string()
                 } else {
@@ -180,18 +198,20 @@ impl ModelPickerState {
         }
 
         // Define display order
-        let order = ["anthropic", "openai", "google", "ollama", "other"];
+        let order = [
+            "llama-cpp",
+            "lm-studio",
+            "ollama",
+            "openai",
+            "google",
+            "anthropic",
+            "other",
+        ];
         let mut sections = Vec::new();
         for provider in order {
             if let Some(models) = by_provider.remove(provider) {
                 sections.push(ProviderSection {
-                    provider_name: match provider {
-                        "anthropic" => "ANTHROPIC".to_string(),
-                        "openai" => "OPENAI".to_string(),
-                        "google" => "GOOGLE".to_string(),
-                        "ollama" => "OLLAMA (local)".to_string(),
-                        _ => provider.to_uppercase(),
-                    },
+                    provider_name: provider_display_name(provider),
                     models,
                 });
             }
@@ -199,7 +219,7 @@ impl ModelPickerState {
         // Add any remaining providers not in the order list
         for (provider, models) in by_provider {
             sections.push(ProviderSection {
-                provider_name: provider.to_uppercase(),
+                provider_name: provider_display_name(&provider),
                 models,
             });
         }
@@ -245,7 +265,8 @@ pub fn models_for_provider_from_registry(
     provider_id: &str,
     registry: &claurst_api::ModelRegistry,
 ) -> Vec<ModelEntry> {
-    let entries = registry.list_by_provider(provider_id);
+    let canonical_provider = canonical_provider_id(provider_id);
+    let entries = registry.list_by_provider(&canonical_provider);
     if !entries.is_empty() {
         entries
             .iter()
@@ -265,7 +286,7 @@ pub fn models_for_provider_from_registry(
             .collect()
     } else {
         // Fall back to hardcoded
-        models_for_provider(provider_id)
+        models_for_provider(&canonical_provider)
     }
 }
 
@@ -275,7 +296,7 @@ pub fn models_for_provider_from_registry(
 /// `/model` picker shows relevant choices regardless of whether the API
 /// returned a live model list.
 pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
-    match provider_id {
+    match claurst_core::ProviderId::canonical_str(provider_id) {
         "anthropic" => vec![
             model_entry("claude-opus-4-6", "Claude Opus 4.6", "Most capable — best for complex reasoning and analysis"),
             model_entry("claude-sonnet-4-6", "Claude Sonnet 4.6", "Balanced performance and speed — great for coding tasks"),
@@ -376,10 +397,10 @@ pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
             model_entry("anthropic.claude-sonnet-4-6-v1", "Claude Sonnet 4.6 (Bedrock)", "200K context"),
             model_entry("anthropic.claude-haiku-4-5-20251001-v1", "Claude Haiku 4.5 (Bedrock)", "200K context"),
         ],
-        "lmstudio" => vec![
+        "lm-studio" => vec![
             model_entry("default", "Default model", "local"),
         ],
-        "llamacpp" | "llama-cpp" => vec![
+        "llama-cpp" => vec![
             model_entry("default", "Default model", "local"),
         ],
         _ => vec![
@@ -393,7 +414,7 @@ pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
 /// This is used when connecting to a new provider so the status bar
 /// immediately shows the right model.
 pub fn default_model_for_provider(provider_id: &str) -> String {
-    match provider_id {
+    match claurst_core::ProviderId::canonical_str(provider_id) {
         "anthropic" => "claude-opus-4-6".to_string(),
         "openai" => "openai/gpt-4o".to_string(),
         "google" => "google/gemini-2.5-flash".to_string(),
@@ -410,8 +431,8 @@ pub fn default_model_for_provider(provider_id: &str) -> String {
         "deepinfra" => "deepinfra/meta-llama/Llama-3.3-70B-Instruct".to_string(),
         "venice" => "venice/llama-3.3-70b".to_string(),
         "ollama" => "ollama/llama3.2".to_string(),
-        "lmstudio" => "lmstudio/default".to_string(),
-        "llamacpp" | "llama-cpp" => "llama-cpp/default".to_string(),
+        "lm-studio" => "lm-studio/default".to_string(),
+        "llama-cpp" => "llama-cpp/default".to_string(),
         "azure" => "azure/gpt-4o".to_string(),
         "amazon-bedrock" => "amazon-bedrock/anthropic.claude-sonnet-4-6-v1".to_string(),
         other => format!("{}/default", other),
@@ -1146,6 +1167,13 @@ mod tests {
     }
 
     #[test]
+    fn models_for_provider_llamacpp_alias_is_canonicalized() {
+        let models = models_for_provider("llamacpp");
+        assert!(!models.is_empty());
+        assert_eq!(models[0].id, "default");
+    }
+
+    #[test]
     fn models_for_provider_unknown_returns_default() {
         let models = models_for_provider("some-unknown-provider");
         assert!(!models.is_empty());
@@ -1162,6 +1190,17 @@ mod tests {
     fn default_model_for_provider_anthropic_bare() {
         // Anthropic models are bare (no prefix) for backwards compat.
         assert_eq!(default_model_for_provider("anthropic"), "claude-opus-4-6");
+    }
+
+    #[test]
+    fn build_provider_sections_prioritizes_local_providers() {
+        let sections = ModelPickerState::build_provider_sections(&[
+            "anthropic/claude-sonnet-4-6".to_string(),
+            "llama-cpp/default".to_string(),
+            "ollama/llama3.2".to_string(),
+        ]);
+        let names: Vec<&str> = sections.iter().map(|s| s.provider_name.as_str()).collect();
+        assert_eq!(names.first().copied(), Some("LLAMA.CPP (local)"));
     }
 
     // 18. set_models replaces the model list.

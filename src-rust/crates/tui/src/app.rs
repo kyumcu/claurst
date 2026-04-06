@@ -26,6 +26,7 @@ use crate::{agents_view::{AgentInfo, AgentStatus, AgentsMenuState, AgentsRoute},
 use claurst_core::config::{Config, Settings, Theme};
 use claurst_core::cost::CostTracker;
 use claurst_core::file_history::FileHistory;
+use claurst_core::ProviderId;
 use claurst_core::keybindings::{
     KeyContext, KeybindingResolver, KeybindingResult, ParsedKeystroke, UserKeybindings,
 };
@@ -205,6 +206,9 @@ fn get_url_for_provider(id: &str) -> &'static str {
 
 fn provider_picker_items() -> Vec<SelectItem> {
     vec![
+        SelectItem { id: "llama-cpp".into(), title: "llama.cpp".into(), description: "Local inference server".into(), category: "Local".into(), badge: Some("LOCAL".into()) },
+        SelectItem { id: "ollama".into(), title: "Ollama".into(), description: "Run models locally".into(), category: "Local".into(), badge: Some("LOCAL".into()) },
+        SelectItem { id: "lm-studio".into(), title: "LM Studio".into(), description: "Local model server".into(), category: "Local".into(), badge: Some("LOCAL".into()) },
         SelectItem { id: "openai".into(), title: "OpenAI".into(), description: "(API key)".into(), category: "Popular".into(), badge: None },
         SelectItem { id: "openai-codex".into(), title: "OpenAI Codex".into(), description: "(ChatGPT Plus/Pro — browser login)".into(), category: "Popular".into(), badge: None },
         SelectItem { id: "github-copilot".into(), title: "GitHub Copilot".into(), description: "(GitHub subscription or token)".into(), category: "Popular".into(), badge: None },
@@ -213,11 +217,8 @@ fn provider_picker_items() -> Vec<SelectItem> {
         SelectItem { id: "openrouter".into(), title: "OpenRouter".into(), description: "100+ models with one key".into(), category: "Popular".into(), badge: None },
         SelectItem { id: "vercel".into(), title: "Vercel AI Gateway".into(), description: "Gateway for AI SDK models".into(), category: "Popular".into(), badge: None },
         SelectItem { id: "groq".into(), title: "Groq".into(), description: "Fast hosted inference".into(), category: "Popular".into(), badge: Some("FREE".into()) },
-        SelectItem { id: "ollama".into(), title: "Ollama".into(), description: "Run models locally".into(), category: "Popular".into(), badge: Some("LOCAL".into()) },
         SelectItem { id: "cerebras".into(), title: "Cerebras".into(), description: "Fast hosted inference".into(), category: "Other".into(), badge: Some("FREE".into()) },
         SelectItem { id: "sambanova".into(), title: "SambaNova".into(), description: "Fast hosted inference".into(), category: "Other".into(), badge: Some("FREE".into()) },
-        SelectItem { id: "lmstudio".into(), title: "LM Studio".into(), description: "Local model server".into(), category: "Other".into(), badge: Some("LOCAL".into()) },
-        SelectItem { id: "llama-cpp".into(), title: "llama.cpp".into(), description: "Local inference server".into(), category: "Other".into(), badge: Some("LOCAL".into()) },
         SelectItem { id: "deepseek".into(), title: "DeepSeek".into(), description: "Reasoning and coding models".into(), category: "Other".into(), badge: None },
         SelectItem { id: "mistral".into(), title: "Mistral".into(), description: "Hosted Mistral models".into(), category: "Other".into(), badge: None },
         SelectItem { id: "togetherai".into(), title: "Together AI".into(), description: "Open model hosting".into(), category: "Other".into(), badge: None },
@@ -1031,6 +1032,15 @@ fn format_turn_time_label() -> String {
 }
 
 impl App {
+    fn active_provider_id(&self) -> String {
+        self.config
+            .provider
+            .as_deref()
+            .map(ProviderId::canonicalize)
+            .or_else(|| Self::infer_provider_from_model(&self.model_name).map(ProviderId::canonicalize))
+            .unwrap_or_else(|| ProviderId::LLAMA_CPP.to_string())
+    }
+
     pub fn new(config: Config, cost_tracker: Arc<CostTracker>) -> Self {
         let config = config;
         let model_name = config.effective_model().to_string();
@@ -1353,18 +1363,20 @@ impl App {
     }
 
     fn display_default_model_for_provider(&self, provider_id: &str) -> String {
-        if let Some(best) = self.model_registry.best_model_for_provider(provider_id) {
-            if provider_id == "anthropic" {
+        let provider_id = ProviderId::canonicalize(provider_id);
+        if let Some(best) = self.model_registry.best_model_for_provider(&provider_id) {
+            if provider_id == ProviderId::ANTHROPIC {
                 best
             } else {
                 format!("{}/{}", provider_id, best)
             }
         } else {
-            crate::model_picker::default_model_for_provider(provider_id)
+            crate::model_picker::default_model_for_provider(&provider_id)
         }
     }
 
     fn open_model_picker_for_provider(&mut self, provider_id: &str, title: Option<String>) {
+        let provider_id = ProviderId::canonicalize(provider_id);
         let cache_path = dirs::cache_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."))
             .join("claurst")
@@ -1374,20 +1386,20 @@ impl App {
         }
 
         let models = crate::model_picker::models_for_provider_from_registry(
-            provider_id,
+            &provider_id,
             &self.model_registry,
         );
         self.model_picker.set_models(models);
         self.model_picker_fetch_pending = true;
 
         let provider_prefix = format!("{}/", provider_id);
-        let current_model = if self.config.provider.as_deref() == Some(provider_id) {
+        let current_model = if self.active_provider_id() == provider_id {
             self.model_name
                 .strip_prefix(&provider_prefix)
                 .unwrap_or(self.model_name.as_str())
                 .to_string()
         } else {
-            let default_model = self.display_default_model_for_provider(provider_id);
+            let default_model = self.display_default_model_for_provider(&provider_id);
             default_model
                 .strip_prefix(&provider_prefix)
                 .unwrap_or(default_model.as_str())
@@ -1403,6 +1415,7 @@ impl App {
     }
 
     fn activate_provider(&mut self, provider_id: String, provider_name: String, status_prefix: &str) {
+        let provider_id = ProviderId::canonicalize(provider_id);
         let picker_title = provider_name.clone();
         self.fast_mode = false;
         self.set_provider_default(provider_id.clone());
@@ -1440,14 +1453,13 @@ impl App {
                 "deepinfra",
                 "venice",
                 "ollama",
-                "lmstudio",
-                "llamacpp",
+                "lm-studio",
                 "llama-cpp",
                 "azure",
                 "amazon-bedrock",
             ];
             if known.contains(&provider) {
-                return Some(provider.to_string());
+                return Some(ProviderId::canonicalize(provider));
             }
         }
 
@@ -1459,8 +1471,13 @@ impl App {
             || model.starts_with("o4")
         {
             Some("openai".to_string())
-        } else if model.starts_with("gemini") || model.starts_with("gemma") {
+        } else if model.starts_with("gemini") {
             Some("google".to_string())
+        } else if model.starts_with("gemma")
+            || model.starts_with("llama")
+            || model.starts_with("qwen")
+        {
+            Some(ProviderId::LLAMA_CPP.to_string())
         } else {
             None
         }
@@ -1468,6 +1485,7 @@ impl App {
 
     /// Switch the active provider while clearing any explicit model override.
     fn set_provider_default(&mut self, provider_id: String) {
+        let provider_id = ProviderId::canonicalize(provider_id);
         self.config.provider = Some(provider_id.clone());
         self.config.model = None;
 
@@ -1586,18 +1604,18 @@ impl App {
 
     /// Update the context window size from the model registry for the current model.
     pub fn refresh_context_window_size(&mut self) {
-        let provider = self.config.provider.as_deref().unwrap_or("anthropic");
+        let provider = self.active_provider_id();
         let model_id = self.model_name
             .strip_prefix(&format!("{}/", provider))
             .unwrap_or(&self.model_name);
-        if let Some(entry) = self.model_registry.get(provider, model_id) {
+        if let Some(entry) = self.model_registry.get(&provider, model_id) {
             self.context_window_size = entry.info.context_window as u64;
         } else {
             // Fallback: common defaults
-            self.context_window_size = match provider {
-                "anthropic" => 200_000,
-                "openai" => 128_000,
-                "google" => 1_048_576,
+            self.context_window_size = match provider.as_str() {
+                ProviderId::ANTHROPIC => 200_000,
+                ProviderId::OPENAI => 128_000,
+                ProviderId::GOOGLE => 1_048_576,
                 _ => 128_000,
             };
         }
@@ -1735,11 +1753,7 @@ impl App {
                     self.status_message = Some("Connect a provider to choose a model.".to_string());
                     return true;
                 }
-                let provider = self
-                    .config
-                    .provider
-                    .clone()
-                    .unwrap_or_else(|| "anthropic".to_string());
+                let provider = self.active_provider_id();
                 self.open_model_picker_for_provider(&provider, None);
                 true
             }
@@ -2639,7 +2653,7 @@ impl App {
 
                         match selected.id.as_str() {
                             // Local providers — activate immediately, no key needed
-                            "ollama" | "lmstudio" | "llamacpp" | "llama-cpp" => {
+                            "ollama" | "lm-studio" | "lmstudio" | "llamacpp" | "llama-cpp" => {
                                 self.activate_provider(selected.id.clone(), selected.title.clone(), "Switched to");
                             }
                             "anthropic" => {
@@ -2739,8 +2753,8 @@ impl App {
                         }
                         // Store explicit selections in the canonical
                         // "provider/model" form for non-Anthropic providers.
-                        let provider = self.config.provider.as_deref().unwrap_or("anthropic");
-                        let full_model = if provider == "anthropic" {
+                        let provider = self.active_provider_id();
+                        let full_model = if provider == ProviderId::ANTHROPIC {
                             model_id.clone()
                         } else {
                             format!("{}/{}", provider, model_id)
@@ -4950,11 +4964,7 @@ impl App {
             if let Some(ref mut rx) = self.model_fetch_rx {
                 match rx.try_recv() {
                     Ok(Ok(entries)) => {
-                        let provider = self
-                            .config
-                            .provider
-                            .clone()
-                            .unwrap_or_else(|| "anthropic".to_string());
+                        let provider = self.active_provider_id();
                         let provider_prefix = format!("{}/", provider);
                         let current = self
                             .model_name
@@ -4980,9 +4990,9 @@ impl App {
             // Spawn async provider model-list fetch when requested.
             if self.model_picker_fetch_pending {
                 self.model_picker_fetch_pending = false;
-                let provider_id_str = self.config.provider.clone().unwrap_or_else(|| "anthropic".to_string());
+                let provider_id_str = self.active_provider_id();
                 if let Some(ref registry) = self.provider_registry {
-                    let pid = claurst_core::ProviderId::new(&provider_id_str);
+                    let pid = claurst_core::ProviderId::new(ProviderId::canonicalize(&provider_id_str));
                     if let Some(provider) = registry.get(&pid) {
                         let provider = provider.clone();
                         let (tx, rx) = tokio::sync::mpsc::channel(1);

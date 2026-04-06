@@ -37,6 +37,7 @@ use claurst_core::{
     context::ContextBuilder,
     cost::CostTracker,
     permissions::{AutoPermissionHandler, InteractivePermissionHandler},
+    ProviderId,
 };
 use async_trait::async_trait;
 use claurst_core::types::ToolDefinition;
@@ -248,7 +249,7 @@ struct Cli {
     #[arg(long = "fallback-model")]
     fallback_model: Option<String>,
 
-    /// LLM provider to use (default: anthropic). Examples: openai, google, ollama
+    /// LLM provider to use. Examples: llama-cpp, openai, google, ollama
     #[arg(long, env = "CLAURST_PROVIDER")]
     provider: Option<String>,
 
@@ -454,11 +455,15 @@ async fn main() -> anyhow::Result<()> {
     }
     config.project_dir = Some(cwd.clone());
     if let Some(p) = &cli.provider {
-        config.provider = Some(p.clone());
+        config.provider = Some(ProviderId::canonicalize(p));
     }
     if let Some(base) = &cli.api_base {
         // Store in the provider's config entry
-        let provider_id = config.provider.clone().unwrap_or_else(|| "anthropic".to_string());
+        let provider_id = config
+            .provider
+            .clone()
+            .map(ProviderId::canonicalize)
+            .unwrap_or_else(|| ProviderId::LLAMA_CPP.to_string());
         config
             .provider_configs
             .entry(provider_id)
@@ -501,13 +506,14 @@ async fn main() -> anyhow::Result<()> {
     let is_headless = cli.print || cli.prompt.is_some();
 
     // Initialize API client.
-    // Try config/env first; fall back to saved OAuth tokens.
-    // If no Anthropic credentials are found, check whether any other provider is
-    // configured (OpenAI, Google, Ollama, Groq, etc.) — if so, proceed without
-    // requiring Anthropic auth. Only launch the OAuth flow when Anthropic is
-    // explicitly the intended provider and no key exists at all.
+    // Try config/env first; fall back to saved OAuth tokens for Anthropic only.
+    // Local and other non-Anthropic providers should not trigger Anthropic auth.
     let other_provider_configured = {
-        let active_provider = config.provider.as_deref().unwrap_or("anthropic");
+        let active_provider = config
+            .provider
+            .as_deref()
+            .map(ProviderId::canonical_str)
+            .unwrap_or(ProviderId::LLAMA_CPP);
         let has_non_anthropic_env =
             std::env::var("OPENAI_API_KEY").is_ok()
             || std::env::var("GOOGLE_API_KEY").is_ok()
@@ -527,15 +533,21 @@ async fn main() -> anyhow::Result<()> {
             || std::env::var("AZURE_API_KEY").is_ok()
             || std::env::var("GITHUB_TOKEN").is_ok()
             || std::env::var("AWS_BEARER_TOKEN_BEDROCK").is_ok()
-            || std::env::var("AWS_ACCESS_KEY_ID").is_ok()
-            // Local providers are always available
-            || true; // Ollama/LM Studio don't require keys
-        active_provider != "anthropic" || has_non_anthropic_env
+            || std::env::var("AWS_ACCESS_KEY_ID").is_ok();
+        active_provider != ProviderId::ANTHROPIC || has_non_anthropic_env
     };
 
     let (api_key, use_bearer_auth) = match config.resolve_auth_async().await {
         Some(auth) => auth,
-        None if other_provider_configured && config.provider.as_deref().unwrap_or("anthropic") != "anthropic" => {
+        None
+            if other_provider_configured
+                && config
+                    .provider
+                    .as_deref()
+                    .map(ProviderId::canonical_str)
+                    .unwrap_or(ProviderId::LLAMA_CPP)
+                    != ProviderId::ANTHROPIC =>
+        {
             // Non-Anthropic provider selected — no Anthropic key needed.
             (String::new(), false)
         }
@@ -545,11 +557,12 @@ async fn main() -> anyhow::Result<()> {
             if is_headless {
                 anyhow::bail!(
                     "No API key found. Options:\n\
+                     - Run `claurst --provider llama-cpp` for llama.cpp (local, no key needed)\n\
+                     - Run `claurst --provider ollama` for Ollama (local, no key needed)\n\
                      - Set ANTHROPIC_API_KEY for Anthropic\n\
                      - Set OPENAI_API_KEY for OpenAI\n\
                      - Set GOOGLE_API_KEY for Google Gemini\n\
                      - Set GROQ_API_KEY for Groq (fast, free tier available)\n\
-                     - Run `claurst --provider ollama` for local models (no key needed)\n\
                      - Run `claurst auth login` for Anthropic OAuth"
                 );
             } else {
@@ -571,11 +584,9 @@ async fn main() -> anyhow::Result<()> {
             .context("Failed to create API client")?,
     );
 
-    // Build provider registry: auto-registers all env-configured providers
-    // AND providers with keys stored in ~/.claurst/auth.json (from /connect).
-    // Anthropic is always the default; additional providers (OpenAI, Google,
-    // Bedrock, Azure, Copilot, Cohere, local providers) are registered when
-    // their respective environment variables or auth store entries are found.
+    // Build provider registry: auto-register env-configured providers and any
+    // providers with saved credentials from /connect. This is local-first and
+    // should not assume Anthropic is the default runtime path.
     let provider_registry =
         claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config);
 
@@ -742,7 +753,11 @@ async fn main() -> anyhow::Result<()> {
         .await
     } else {
         let has_credentials = !api_key.is_empty()
-            || config.provider.as_deref().is_some_and(|p| p != "anthropic");
+            || config
+                .provider
+                .as_deref()
+                .map(ProviderId::canonical_str)
+                .is_some_and(|p| p != ProviderId::ANTHROPIC);
         run_interactive(
             config,
             settings,
@@ -1330,7 +1345,8 @@ async fn run_interactive(
     // If a non-Anthropic provider is active, prefix model_name with "provider/model"
     // so the status bar can show the provider name.
     if let Some(ref provider) = live_config.provider {
-        if provider != "anthropic" && !app.model_name.contains('/') {
+        let provider = ProviderId::canonicalize(provider);
+        if provider != ProviderId::ANTHROPIC && !app.model_name.contains('/') {
             app.model_name = format!("{}/{}", provider, app.model_name);
         }
     }
