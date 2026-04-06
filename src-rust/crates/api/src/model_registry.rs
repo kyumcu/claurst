@@ -15,6 +15,10 @@ use claurst_core::provider_id::{ModelId, ProviderId};
 
 use crate::provider::ModelInfo;
 
+fn canonical_provider_id(provider_id: &str) -> &str {
+    ProviderId::canonical_str(provider_id)
+}
+
 // ---------------------------------------------------------------------------
 // ModelEntry
 // ---------------------------------------------------------------------------
@@ -183,8 +187,13 @@ impl ModelRegistry {
 
     /// Get an entry by `"provider_id/model_id"` key.
     pub fn get(&self, provider_id: &str, model_id: &str) -> Option<&ModelEntry> {
+        let raw_provider_id = provider_id;
+        let provider_id = canonical_provider_id(provider_id);
         let key = format!("{}/{}", provider_id, model_id);
-        self.entries.get(&key)
+        self.entries.get(&key).or_else(|| {
+            let raw_key = format!("{}/{}", raw_provider_id, model_id);
+            self.entries.get(&raw_key)
+        })
     }
 
     /// Resolve a model string into `(ProviderId, ModelId)`.
@@ -193,7 +202,7 @@ impl ModelRegistry {
     /// to the Anthropic provider).
     pub fn resolve(s: &str) -> (ProviderId, ModelId) {
         if let Some((provider, model)) = s.split_once('/') {
-            (ProviderId::new(provider), ModelId::new(model))
+            (ProviderId::new(canonical_provider_id(provider)), ModelId::new(model))
         } else {
             (ProviderId::new(ProviderId::ANTHROPIC), ModelId::new(s))
         }
@@ -235,7 +244,7 @@ impl ModelRegistry {
             None
         };
         if let Some(pid) = canonical {
-            return Some(ProviderId::new(pid));
+            return Some(ProviderId::new(canonical_provider_id(pid)));
         }
 
         // 2. Exact match: look for any entry whose model ID matches.
@@ -261,6 +270,7 @@ impl ModelRegistry {
 
     /// List all models for a given provider.
     pub fn list_by_provider(&self, provider_id: &str) -> Vec<&ModelEntry> {
+        let provider_id = canonical_provider_id(provider_id);
         self.entries
             .values()
             .filter(|e| &*e.info.provider_id == provider_id)
@@ -276,6 +286,7 @@ impl ModelRegistry {
     ///
     /// Returns the model ID string, or `None` if the provider has no models.
     pub fn best_model_for_provider(&self, provider_id: &str) -> Option<String> {
+        let provider_id = canonical_provider_id(provider_id);
         let mut models: Vec<&ModelEntry> = self.list_by_provider(provider_id);
         if models.is_empty() {
             return None;
@@ -334,6 +345,7 @@ impl ModelRegistry {
     /// Uses the same priority-sort pattern as [`best_model_for_provider`]
     /// but with a different priority list targeting lightweight models.
     pub fn best_small_model_for_provider(&self, provider_id: &str) -> Option<String> {
+        let provider_id = canonical_provider_id(provider_id);
         let mut models: Vec<&ModelEntry> = self.list_by_provider(provider_id);
         if models.is_empty() {
             return None;
@@ -464,7 +476,7 @@ impl ModelRegistry {
                             .and_then(|r| r.as_bool())
                             .unwrap_or(false);
 
-                        let pid = ProviderId::new(provider_id.as_str());
+                        let pid = ProviderId::new(canonical_provider_id(provider_id));
                         let mid = ModelId::new(model_id.as_str());
                         let key = format!("{}/{}", pid, mid);
 
@@ -544,6 +556,60 @@ impl Default for ModelRegistry {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add_model(registry: &mut ModelRegistry, provider_id: &str, model_id: &str) {
+        registry.entries.insert(
+            format!("{}/{}", provider_id, model_id),
+            ModelEntry {
+                info: ModelInfo {
+                    id: ModelId::new(model_id),
+                    provider_id: ProviderId::new(provider_id),
+                    name: model_id.to_string(),
+                    context_window: 1,
+                    max_output_tokens: 1,
+                },
+                cost_input: None,
+                cost_output: None,
+                cost_cache_read: None,
+                cost_cache_write: None,
+                tool_calling: false,
+                reasoning: false,
+                vision: false,
+                family: None,
+                status: "active".to_string(),
+            },
+        );
+    }
+
+    #[test]
+    fn canonicalized_provider_lookup_uses_canonical_keys() {
+        let mut registry = ModelRegistry::new();
+        add_model(&mut registry, ProviderId::LLAMA_CPP, "default");
+
+        assert!(registry.get("llamacpp", "default").is_some());
+        assert!(registry.get("llama.cpp", "default").is_some());
+        assert_eq!(
+            registry.best_model_for_provider("llamacpp").as_deref(),
+            Some("default")
+        );
+    }
+
+    #[test]
+    fn effective_model_prefers_llama_cpp_when_provider_is_unset() {
+        let mut registry = ModelRegistry::new();
+        add_model(&mut registry, ProviderId::LLAMA_CPP, "default");
+
+        let config = claurst_core::Config::default();
+        assert_eq!(
+            effective_model_for_config(&config, &registry),
+            "default"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic model resolution helper
 // ---------------------------------------------------------------------------
@@ -553,9 +619,11 @@ impl Default for ModelRegistry {
 ///
 /// **Resolution order** (mirrors OpenCode's approach):
 ///  1. If the user explicitly set `config.model`, use it verbatim.
-///  2. Consult the model registry for the configured provider's best model
-///     (scored by flagship priority -> "latest" preference -> ID desc).
-///  3. Fall back to the hardcoded table in [`Config::effective_model()`].
+    ///  2. Consult the model registry for the configured provider's best model
+    ///     (scored by flagship priority -> "latest" preference -> ID desc).
+    ///  3. If no provider is configured, prefer the local `llama.cpp`
+    ///     registry entry when available.
+    ///  4. Fall back to the hardcoded table in [`Config::effective_model()`].
 pub fn effective_model_for_config(
     config: &claurst_core::Config,
     registry: &ModelRegistry,
@@ -567,9 +635,15 @@ pub fn effective_model_for_config(
 
     // Try the model registry for the configured provider.
     if let Some(provider_id) = config.provider.as_deref() {
+        let provider_id = canonical_provider_id(provider_id);
         if let Some(best) = registry.best_model_for_provider(provider_id) {
             return best;
         }
+        return config.effective_model().to_string();
+    }
+
+    if let Some(best) = registry.best_model_for_provider(ProviderId::LLAMA_CPP) {
+        return best;
     }
 
     // Fall back to the hardcoded table.
