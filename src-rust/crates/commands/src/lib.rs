@@ -7256,50 +7256,35 @@ impl SlashCommand for UndoCommand {
 #[async_trait]
 impl SlashCommand for ProvidersCommand {
     fn name(&self) -> &str { "providers" }
-    fn description(&self) -> &str { "List available AI providers and their status" }
+    fn description(&self) -> &str { "List the supported AI providers" }
     fn help(&self) -> &str {
-        "Usage: /providers\n\nList all providers registered in the model registry with their\nmodel counts, context windows, and pricing information."
+        "Usage: /providers\n\nList the supported provider surface for this build and show the current active provider."
     }
 
-    async fn execute(&self, _args: &str, _ctx: &mut CommandContext) -> CommandResult {
-        let registry = claurst_api::ModelRegistry::new();
-        let all = registry.list_all();
+    async fn execute(&self, _args: &str, ctx: &mut CommandContext) -> CommandResult {
+        let current = ctx
+            .config
+            .provider
+            .as_deref()
+            .map(claurst_core::ProviderId::canonicalize)
+            .unwrap_or_else(|| claurst_core::ProviderId::LLAMA_CPP.to_string());
 
-        if all.is_empty() {
-            return CommandResult::Message("No providers available.".to_string());
-        }
-
-        // Group by provider
-        use std::collections::HashMap;
-        let mut by_provider: HashMap<String, Vec<_>> = HashMap::new();
-        for entry in &all {
-            by_provider
-                .entry(entry.info.provider_id.to_string())
-                .or_default()
-                .push(entry);
-        }
-
-        // Sort providers alphabetically for stable output
-        let mut provider_keys: Vec<String> = by_provider.keys().cloned().collect();
-        provider_keys.sort();
-
-        let mut lines = vec!["Available providers:\n".to_string()];
-        for provider in &provider_keys {
-            let models = &by_provider[provider];
-            lines.push(format!("\n{} ({} model{})", provider.to_uppercase(), models.len(),
-                if models.len() == 1 { "" } else { "s" }));
-            for m in models.iter().take(3) {
-                let cost_str = match (m.cost_input, m.cost_output) {
-                    (Some(i), Some(o)) => format!("${:.2}/${:.2} per 1M", i, o),
-                    _ => "free/local".to_string(),
-                };
-                lines.push(format!("  {} — {}K ctx, {}",
-                    m.info.id, m.info.context_window / 1000, cost_str));
-            }
-            if models.len() > 3 {
-                lines.push(format!("  ... and {} more", models.len() - 3));
-            }
-        }
+        let lines = [
+            "Supported providers:",
+            "",
+            "Local",
+            "  llama-cpp   — local inference server",
+            "  ollama      — local model runner",
+            "  lm-studio   — local model server",
+            "",
+            "Hosted",
+            "  openai      — API key",
+            "  openai-codex — browser login",
+            "  google      — API key",
+            "  anthropic   — API key (best-effort support)",
+            "",
+            &format!("Current provider: {}", current),
+        ];
 
         CommandResult::Message(lines.join("\n"))
     }

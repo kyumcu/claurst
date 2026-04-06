@@ -318,69 +318,6 @@ pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
             model_entry("gemini-2.5-flash", "Gemini 2.5 Flash", "1M context"),
             model_entry("gemini-2.0-flash", "Gemini 2.0 Flash", "1M context"),
         ],
-        "groq" => vec![
-            model_entry("llama-3.3-70b-versatile", "Llama 3.3 70B", "128K context"),
-            model_entry("llama-3.1-8b-instant", "Llama 3.1 8B", "128K context"),
-            model_entry("mixtral-8x7b-32768", "Mixtral 8x7B", "32K context"),
-            model_entry("gemma2-9b-it", "Gemma 2 9B", "8K context"),
-        ],
-        "cerebras" => vec![
-            model_entry("llama-3.3-70b", "Llama 3.3 70B", "128K context"),
-            model_entry("llama-3.1-8b", "Llama 3.1 8B", "128K context"),
-        ],
-        "deepseek" => vec![
-            model_entry("deepseek-chat", "DeepSeek V3", "64K context"),
-            model_entry("deepseek-reasoner", "DeepSeek R1", "64K context"),
-        ],
-        "mistral" => vec![
-            model_entry("mistral-large-latest", "Mistral Large", "128K context"),
-            model_entry("mistral-small-latest", "Mistral Small", "128K context"),
-            model_entry("codestral-latest", "Codestral", "32K context"),
-        ],
-        "xai" => vec![
-            model_entry("grok-2", "Grok 2", "128K context"),
-            model_entry("grok-3", "Grok 3", "128K context"),
-            model_entry("grok-3-mini", "Grok 3 mini", "128K context"),
-        ],
-        "openrouter" => vec![
-            model_entry("anthropic/claude-sonnet-4", "Claude Sonnet 4", "via OpenRouter"),
-            model_entry("openai/gpt-4o", "GPT-4o", "via OpenRouter"),
-            model_entry("google/gemini-2.5-pro", "Gemini 2.5 Pro", "via OpenRouter"),
-            model_entry("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B", "via OpenRouter"),
-        ],
-        "github-copilot" => vec![
-            model_entry("claude-sonnet-4.6", "Claude Sonnet 4.6", "via Copilot"),
-            model_entry("claude-sonnet-4.5", "Claude Sonnet 4.5", "via Copilot"),
-            model_entry("claude-haiku-4.5", "Claude Haiku 4.5", "via Copilot"),
-            model_entry("gpt-4.1", "GPT-4.1", "via Copilot"),
-            model_entry("gpt-4o", "GPT-4o", "via Copilot"),
-            model_entry("gpt-4o-mini", "GPT-4o mini", "via Copilot"),
-            model_entry("gpt-5.4", "GPT-5.4", "via Copilot"),
-            model_entry("gpt-5-mini", "GPT-5 mini", "via Copilot"),
-            model_entry("o3-mini", "o3 mini", "via Copilot"),
-            model_entry("o4-mini", "o4 mini", "via Copilot"),
-            model_entry("gemini-3-flash-preview", "Gemini 3 Flash", "via Copilot"),
-        ],
-        "cohere" => vec![
-            model_entry("command-r-plus", "Command R+", "128K context"),
-            model_entry("command-r", "Command R", "128K context"),
-        ],
-        "perplexity" => vec![
-            model_entry("sonar-pro", "Sonar Pro", "search-augmented"),
-            model_entry("sonar", "Sonar", "search-augmented"),
-        ],
-        "togetherai" | "together-ai" => vec![
-            model_entry("meta-llama/Llama-3.3-70B-Instruct-Turbo", "Llama 3.3 70B Turbo", "128K context"),
-            model_entry("meta-llama/Llama-3.1-8B-Instruct-Turbo", "Llama 3.1 8B Turbo", "128K context"),
-            model_entry("Qwen/Qwen2.5-72B-Instruct-Turbo", "Qwen 2.5 72B Turbo", "128K context"),
-        ],
-        "deepinfra" => vec![
-            model_entry("meta-llama/Llama-3.3-70B-Instruct", "Llama 3.3 70B", "128K context"),
-            model_entry("meta-llama/Llama-3.1-8B-Instruct", "Llama 3.1 8B", "128K context"),
-        ],
-        "venice" => vec![
-            model_entry("llama-3.3-70b", "Llama 3.3 70B", "128K context"),
-        ],
         "ollama" => vec![
             model_entry("llama3.2", "Llama 3.2", "local"),
             model_entry("mistral", "Mistral", "local"),
@@ -388,14 +325,6 @@ pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
             model_entry("gemma2", "Gemma 2", "local"),
             model_entry("phi3", "Phi-3", "local"),
             model_entry("qwen2.5", "Qwen 2.5", "local"),
-        ],
-        "azure" => vec![
-            model_entry("gpt-4o", "GPT-4o (Azure)", "128K context"),
-            model_entry("gpt-4o-mini", "GPT-4o mini (Azure)", "128K context"),
-        ],
-        "amazon-bedrock" => vec![
-            model_entry("anthropic.claude-sonnet-4-6-v1", "Claude Sonnet 4.6 (Bedrock)", "200K context"),
-            model_entry("anthropic.claude-haiku-4-5-20251001-v1", "Claude Haiku 4.5 (Bedrock)", "200K context"),
         ],
         "lm-studio" => vec![
             model_entry("default", "Default model", "local"),
@@ -418,23 +347,9 @@ pub fn default_model_for_provider(provider_id: &str) -> String {
         "anthropic" => "claude-opus-4-6".to_string(),
         "openai" => "openai/gpt-4o".to_string(),
         "google" => "google/gemini-2.5-flash".to_string(),
-        "groq" => "groq/llama-3.3-70b-versatile".to_string(),
-        "cerebras" => "cerebras/llama-3.3-70b".to_string(),
-        "deepseek" => "deepseek/deepseek-chat".to_string(),
-        "mistral" => "mistral/mistral-large-latest".to_string(),
-        "xai" => "xai/grok-2".to_string(),
-        "openrouter" => "openrouter/anthropic/claude-sonnet-4".to_string(),
-        "github-copilot" => "github-copilot/gpt-4o".to_string(),
-        "cohere" => "cohere/command-r-plus".to_string(),
-        "perplexity" => "perplexity/sonar-pro".to_string(),
-        "togetherai" | "together-ai" => "togetherai/meta-llama/Llama-3.3-70B-Instruct-Turbo".to_string(),
-        "deepinfra" => "deepinfra/meta-llama/Llama-3.3-70B-Instruct".to_string(),
-        "venice" => "venice/llama-3.3-70b".to_string(),
         "ollama" => "ollama/llama3.2".to_string(),
         "lm-studio" => "lm-studio/default".to_string(),
         "llama-cpp" => "llama-cpp/default".to_string(),
-        "azure" => "azure/gpt-4o".to_string(),
-        "amazon-bedrock" => "amazon-bedrock/anthropic.claude-sonnet-4-6-v1".to_string(),
         other => format!("{}/default", other),
     }
 }

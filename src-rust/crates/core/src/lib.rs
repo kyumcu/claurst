@@ -943,9 +943,9 @@ pub mod config {
     impl Config {
         /// Resolve the effective model, falling back to a provider-appropriate default.
         ///
-        /// When a non-Anthropic provider is active and no model is explicitly set,
-        /// returns that provider's canonical default model instead of `DEFAULT_MODEL`
-        /// (which is Claude-specific).
+        /// When a provider is active and no model is explicitly set, returns
+        /// that provider's canonical default model instead of a Claude-first
+        /// fallback.
         pub fn effective_model(&self) -> &str {
             if let Some(ref m) = self.model {
                 return m;
@@ -954,24 +954,10 @@ pub mod config {
                 Some("anthropic") => crate::constants::DEFAULT_MODEL,
                 Some("openai") => "gpt-4o",
                 Some("google") => "gemini-2.5-flash",
-                Some("groq") => "llama-3.3-70b-versatile",
-                Some("cerebras") => "llama-3.3-70b",
-                Some("deepseek") => "deepseek-chat",
-                Some("mistral") => "mistral-large-latest",
-                Some("xai") => "grok-2",
-                Some("openrouter") => "anthropic/claude-sonnet-4",
-                Some("together-ai") => "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-                Some("perplexity") => "sonar-pro",
-                Some("cohere") => "command-r-plus",
-                Some("deepinfra") => "meta-llama/Llama-3.3-70B-Instruct",
-                Some("github-copilot") => "gpt-4o",
                 Some("ollama") => "llama3.2",
                 Some("lm-studio") => "default",
                 Some("llama-cpp") => "default",
-                Some("azure") => "gpt-4o",
-                Some("amazon-bedrock") => "anthropic.claude-sonnet-4-6-v1",
-                Some("venice") => "llama-3.3-70b",
-                _ => crate::constants::DEFAULT_MODEL,
+                _ => "default",
             }
         }
 
@@ -1038,26 +1024,11 @@ pub mod config {
                         "anthropic" => "ANTHROPIC_API_KEY",
                         "openai" => "OPENAI_API_KEY",
                         "google" => "GOOGLE_API_KEY",
-                        "groq" => "GROQ_API_KEY",
-                        "cerebras" => "CEREBRAS_API_KEY",
-                        "deepseek" => "DEEPSEEK_API_KEY",
-                        "mistral" => "MISTRAL_API_KEY",
-                        "xai" => "XAI_API_KEY",
-                        "openrouter" => "OPENROUTER_API_KEY",
-                        "together-ai" => "TOGETHER_API_KEY",
-                        "perplexity" => "PERPLEXITY_API_KEY",
-                        "cohere" => "COHERE_API_KEY",
-                        "deepinfra" => "DEEPINFRA_API_KEY",
-                        "venice" => "VENICE_API_KEY",
-                        "github-copilot" => "GITHUB_TOKEN",
-                        "azure" => "AZURE_API_KEY",
-                        "huggingface" => "HF_TOKEN",
-                        "nvidia" => "NVIDIA_API_KEY",
                         _ => return None,
                     };
                     std::env::var(env_var).ok().filter(|k| !k.is_empty())
                 }
-                None => std::env::var("ANTHROPIC_API_KEY").ok(),
+                None => None,
             }
         }
 
@@ -1077,9 +1048,8 @@ pub mod config {
                 .as_deref()
                 .map(crate::provider_id::ProviderId::canonical_str);
 
-            match provider {
-                Some("anthropic") | None => {}
-                _ => return None,
+            if !matches!(provider, Some("anthropic")) {
+                return None;
             }
 
             // Fall back to saved OAuth tokens
