@@ -111,7 +111,11 @@ impl CommandQueue {
             .unwrap_or_default()
             .as_millis() as u64;
         let mut heap = self.0.lock().unwrap();
-        heap.push(QueueEntry { command, priority, timestamp: ts });
+        heap.push(QueueEntry {
+            command,
+            priority,
+            timestamp: ts,
+        });
     }
 
     /// Drain all pending commands in priority order (highest first).
@@ -171,4 +175,27 @@ pub fn drain_command_queue(queue: &CommandQueue) -> Vec<claurst_core::types::Mes
     }
 
     messages
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_drain_command_queue_priority_order() {
+        let queue = CommandQueue::new();
+        queue.push(
+            QueuedCommand::InjectUserMessage("normal".to_string()),
+            CommandPriority::Normal,
+        );
+        queue.push(
+            QueuedCommand::InjectSystemMessage("high".to_string()),
+            CommandPriority::High,
+        );
+
+        let messages = drain_command_queue(&queue);
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0].get_all_text(), "[System]: high");
+        assert_eq!(messages[1].get_all_text(), "normal");
+    }
 }
