@@ -379,7 +379,7 @@ pub fn models_for_provider(provider_id: &str) -> Vec<ModelEntry> {
         "lmstudio" => vec![
             model_entry("default", "Default model", "local"),
         ],
-        "llamacpp" => vec![
+        "llamacpp" | "llama-cpp" => vec![
             model_entry("default", "Default model", "local"),
         ],
         _ => vec![
@@ -411,7 +411,7 @@ pub fn default_model_for_provider(provider_id: &str) -> String {
         "venice" => "venice/llama-3.3-70b".to_string(),
         "ollama" => "ollama/llama3.2".to_string(),
         "lmstudio" => "lmstudio/default".to_string(),
-        "llamacpp" => "llamacpp/default".to_string(),
+        "llamacpp" | "llama-cpp" => "llama-cpp/default".to_string(),
         "azure" => "azure/gpt-4o".to_string(),
         "amazon-bedrock" => "amazon-bedrock/anthropic.claude-sonnet-4-6-v1".to_string(),
         other => format!("{}/default", other),

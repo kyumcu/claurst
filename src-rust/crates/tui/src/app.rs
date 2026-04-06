@@ -218,7 +218,7 @@ fn provider_picker_items() -> Vec<SelectItem> {
         SelectItem { id: "cerebras".into(), title: "Cerebras".into(), description: "Fast hosted inference".into(), category: "Other".into(), badge: Some("FREE".into()) },
         SelectItem { id: "sambanova".into(), title: "SambaNova".into(), description: "Fast hosted inference".into(), category: "Other".into(), badge: Some("FREE".into()) },
         SelectItem { id: "lmstudio".into(), title: "LM Studio".into(), description: "Local model server".into(), category: "Other".into(), badge: Some("LOCAL".into()) },
-        SelectItem { id: "llamacpp".into(), title: "llama.cpp".into(), description: "Local inference server".into(), category: "Other".into(), badge: Some("LOCAL".into()) },
+        SelectItem { id: "llama-cpp".into(), title: "llama.cpp".into(), description: "Local inference server".into(), category: "Other".into(), badge: Some("LOCAL".into()) },
         SelectItem { id: "deepseek".into(), title: "DeepSeek".into(), description: "Reasoning and coding models".into(), category: "Other".into(), badge: None },
         SelectItem { id: "mistral".into(), title: "Mistral".into(), description: "Hosted Mistral models".into(), category: "Other".into(), badge: None },
         SelectItem { id: "togetherai".into(), title: "Together AI".into(), description: "Open model hosting".into(), category: "Other".into(), badge: None },
@@ -1449,6 +1449,7 @@ impl App {
                 "ollama",
                 "lmstudio",
                 "llamacpp",
+                "llama-cpp",
                 "azure",
                 "amazon-bedrock",
             ];
@@ -2645,7 +2646,7 @@ impl App {
 
                         match selected.id.as_str() {
                             // Local providers — activate immediately, no key needed
-                            "ollama" | "lmstudio" | "llamacpp" => {
+                            "ollama" | "lmstudio" | "llamacpp" | "llama-cpp" => {
                                 self.activate_provider(selected.id.clone(), selected.title.clone(), "Switched to");
                             }
                             "anthropic" => {

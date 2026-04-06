@@ -968,7 +968,7 @@ pub mod config {
                 Some("github-copilot") => "gpt-4o",
                 Some("ollama") => "llama3.2",
                 Some("lmstudio") => "default",
-                Some("llamacpp") => "default",
+                Some("llamacpp") | Some("llama-cpp") => "default",
                 Some("azure") => "gpt-4o",
                 Some("amazon-bedrock") => "anthropic.claude-sonnet-4-6-v1",
                 Some("venice") => "llama-3.3-70b",
