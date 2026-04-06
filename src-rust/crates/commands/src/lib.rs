@@ -141,7 +141,6 @@ pub struct EffortCommand;
 pub struct SummaryCommand;
 pub struct CommitCommand;
 pub struct PluginCommand;
-pub struct ReloadPluginsCommand;
 pub struct ThemeCommand;
 pub struct OutputStyleCommand;
 pub struct KeybindingsCommand;
@@ -397,7 +396,7 @@ fn command_category(name: &str) -> &'static str {
         "session" | "resume" | "share" | "teleport" => "Sessions & Remote",
         "help" | "exit" | "feedback" | "bug" => "General",
         "think-back" | "thinkback-play" | "thinking" | "plan" | "tasks" => "AI & Thinking",
-        "copy" | "skills" | "agents" | "plugin" | "reload-plugins"
+        "copy" | "skills" | "agents" | "plugin"
         | "stickers" | "passes" | "desktop" | "mobile" | "btw" => "Tools & Extras",
         _ => "Other",
     }
@@ -1585,7 +1584,7 @@ impl SlashCommand for PluginCommand {
     fn aliases(&self) -> Vec<&str> { vec!["plugins"] }
     fn description(&self) -> &str { "Manage plugins" }
     fn help(&self) -> &str {
-        "Usage: /plugin [list|info <name>|enable <name>|disable <name>|install <path>|reload]\n\
+        "Usage: /plugin [list|info <name>|enable <name>|disable <name>|install <path>]\n\
          Manage Claurst plugins.\n\n\
          Subcommands:\n\
            /plugin              — list all installed plugins\n\
@@ -1593,8 +1592,7 @@ impl SlashCommand for PluginCommand {
            /plugin info <name>  — show detailed info about a plugin\n\
            /plugin enable <name>   — enable a plugin (persisted to settings)\n\
            /plugin disable <name>  — disable a plugin (persisted to settings)\n\
-           /plugin install <path>  — install a plugin from a local directory\n\
-           /plugin reload       — reload plugins from disk"
+           /plugin install <path>  — install a plugin from a local directory"
     }
 
     async fn execute(&self, args: &str, ctx: &mut CommandContext) -> CommandResult {
@@ -1641,7 +1639,7 @@ impl SlashCommand for PluginCommand {
                 settings.disabled_plugins.remove(&name);
                 let _ = settings.save_sync();
                 CommandResult::Message(format!(
-                    "Plugin '{}' enabled. Run `/plugin reload` to apply changes in this session.",
+                    "Plugin '{}' enabled. Restart Claurst to apply the change in this session.",
                     name
                 ))
             }
@@ -1664,7 +1662,7 @@ impl SlashCommand for PluginCommand {
                 settings.enabled_plugins.remove(&name);
                 let _ = settings.save_sync();
                 CommandResult::Message(format!(
-                    "Plugin '{}' disabled. Run `/plugin reload` to apply changes in this session.",
+                    "Plugin '{}' disabled. Restart Claurst to apply the change in this session.",
                     name
                 ))
             }
@@ -1690,17 +1688,11 @@ impl SlashCommand for PluginCommand {
                 );
                 match result {
                     Ok(name) => CommandResult::Message(format!(
-                        "Plugin '{}' installed successfully. Run `/plugin reload` to activate it.",
+                        "Plugin '{}' installed successfully. Restart Claurst to activate it.",
                         name
                     )),
                     Err(e) => CommandResult::Error(format!("Install failed: {}", e)),
                 }
-            }
-            claurst_plugins::PluginSubCommand::Reload => {
-                let old_registry = get_registry(&project_dir).await;
-                let (new_registry, diff) =
-                    claurst_plugins::reload_plugins(&old_registry, &project_dir, &[]).await;
-                CommandResult::Message(claurst_plugins::format_reload_summary(&new_registry, &diff))
             }
             claurst_plugins::PluginSubCommand::Help => {
                 CommandResult::Message(
@@ -1710,34 +1702,11 @@ impl SlashCommand for PluginCommand {
                      /plugin info <name>  — show plugin details\n\
                      /plugin enable <name>   — enable a plugin\n\
                      /plugin disable <name>  — disable a plugin\n\
-                     /plugin install <path>  — install plugin from local path\n\
-                     /plugin reload       — reload plugins from disk"
+                     /plugin install <path>  — install plugin from local path"
                         .to_string(),
                 )
             }
         }
-    }
-}
-
-// ---- /reload-plugins -----------------------------------------------------
-
-#[async_trait]
-impl SlashCommand for ReloadPluginsCommand {
-    fn name(&self) -> &str { "reload-plugins" }
-    fn description(&self) -> &str { "Reload all plugins without restarting" }
-    fn help(&self) -> &str {
-        "Usage: /reload-plugins\n\
-         Reloads all plugins and shows what changed."
-    }
-
-    async fn execute(&self, _args: &str, ctx: &mut CommandContext) -> CommandResult {
-        let project_dir = ctx.working_dir.clone();
-
-        let old_registry = claurst_plugins::load_plugins(&project_dir, &[]).await;
-        let (new_registry, diff) =
-            claurst_plugins::reload_plugins(&old_registry, &project_dir, &[]).await;
-
-        CommandResult::Message(claurst_plugins::format_reload_summary(&new_registry, &diff))
     }
 }
 
@@ -7400,7 +7369,6 @@ pub fn all_commands() -> Vec<Box<dyn SlashCommand>> {
         Box::new(PluginCommand),
         Box::new(VersionCommand),
         Box::new(ResumeCommand),
-        Box::new(ReloadPluginsCommand),
         Box::new(StatusCommand),
         Box::new(DiffCommand),
         Box::new(MemoryCommand),
@@ -7810,7 +7778,7 @@ mod tests {
             "help", "clear", "compact", "cost", "exit", "model",
             "config", "version", "status", "diff", "memory", "hooks",
             "permissions", "plan", "tasks", "session", "login", "logout", "refresh",
-            "feedback", "usage", "plugin", "reload-plugins",
+            "feedback", "usage", "plugin",
             "add-dir", "agents", "branch", "tag",
             "passes", "ide", "pr-comments", "desktop", "mobile",
             "install-github-app", "stickers",

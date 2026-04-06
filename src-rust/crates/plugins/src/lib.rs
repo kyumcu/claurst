@@ -1,7 +1,7 @@
 // claurst-plugins: Plugin runtime for the Claurst CLI.
 //
 // This crate handles plugin discovery, manifest parsing, hook registration,
-// and the /plugin + /reload-plugins command definitions.
+// and the local /plugin command definitions.
 //
 // Dependency order: cc-plugins → cc-core only.
 // cc-commands → cc-plugins (not the other way around).
@@ -9,7 +9,6 @@
 pub mod hooks;
 pub mod loader;
 pub mod manifest;
-pub mod marketplace;
 pub mod plugin;
 pub mod registry;
 
@@ -20,9 +19,7 @@ pub use manifest::{
     HookEventKind, PluginAuthor, PluginHookEntry, PluginHookMatcher, PluginHooksConfig,
     PluginLspServer, PluginManifest, PluginMcpServer, UserConfigValueType,
 };
-pub use plugin::{
-    CommandRunAction, LoadedPlugin, PluginCommandDef, PluginError, PluginSource, ReloadDiff,
-};
+pub use plugin::{CommandRunAction, LoadedPlugin, PluginCommandDef, PluginError, PluginSource};
 pub use registry::PluginRegistry;
 
 // ---------------------------------------------------------------------------
@@ -235,19 +232,6 @@ pub async fn load_plugins(
     registry
 }
 
-/// Reload plugins: produce a new registry, compute the diff, and replace the old one.
-///
-/// Returns the new registry and a `ReloadDiff` describing what changed.
-pub async fn reload_plugins(
-    old_registry: &PluginRegistry,
-    project_dir: &Path,
-    extra_paths: &[std::path::PathBuf],
-) -> (PluginRegistry, ReloadDiff) {
-    let new_registry = load_plugins(project_dir, extra_paths).await;
-    let diff = new_registry.diff_against(old_registry);
-    (new_registry, diff)
-}
-
 // ---------------------------------------------------------------------------
 // /plugin command definition (data-only, no SlashCommand impl here)
 // ---------------------------------------------------------------------------
@@ -265,8 +249,6 @@ pub enum PluginSubCommand {
     Info(String),
     /// `/plugin install <path>` — install a plugin from a local path.
     Install(String),
-    /// `/plugin reload` — reload plugins from disk.
-    Reload,
     /// Show usage / help.
     Help,
 }
@@ -293,7 +275,6 @@ pub fn parse_plugin_args(args: &str) -> PluginSubCommand {
         Some("install") | Some("i") => PluginSubCommand::Install(
             parts.get(1).unwrap_or(&"").to_string(),
         ),
-        Some("reload") | Some("refresh") => PluginSubCommand::Reload,
         Some("help") | Some("--help") | Some("-h") => PluginSubCommand::Help,
         _ => PluginSubCommand::Help,
     }
@@ -515,77 +496,6 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// /reload-plugins summary formatting
-// ---------------------------------------------------------------------------
-
-/// Format the result of a plugin reload into a human-readable string,
-/// suitable for the `/reload-plugins` command output.
-pub fn format_reload_summary(
-    registry: &PluginRegistry,
-    diff: &ReloadDiff,
-) -> String {
-    let enabled = registry.enabled_count();
-    let total = registry.plugin_count();
-
-    let mut parts: Vec<String> = Vec::new();
-    parts.push(format!(
-        "{} plugin{} loaded ({} enabled)",
-        total,
-        if total == 1 { "" } else { "s" },
-        enabled
-    ));
-
-    let cmd_count: usize = registry.all_command_defs().len();
-    parts.push(format!(
-        "{} command{}",
-        cmd_count,
-        if cmd_count == 1 { "" } else { "s" }
-    ));
-
-    let hook_count: usize = registry.build_hook_registry().values().map(|v| v.len()).sum();
-    parts.push(format!(
-        "{} hook{}",
-        hook_count,
-        if hook_count == 1 { "" } else { "s" }
-    ));
-
-    let mcp_count = registry.all_mcp_servers().len();
-    parts.push(format!(
-        "{} plugin MCP server{}",
-        mcp_count,
-        if mcp_count == 1 { "" } else { "s" }
-    ));
-
-    let lsp_count = registry.all_lsp_servers().len();
-    parts.push(format!(
-        "{} plugin LSP server{}",
-        lsp_count,
-        if lsp_count == 1 { "" } else { "s" }
-    ));
-
-    let mut msg = format!("Reloaded: {}", parts.join(" · "));
-
-    if !diff.added.is_empty() {
-        msg.push_str(&format!("\nAdded: {}", diff.added.join(", ")));
-    }
-    if !diff.removed.is_empty() {
-        msg.push_str(&format!("\nRemoved: {}", diff.removed.join(", ")));
-    }
-    if !diff.updated.is_empty() {
-        msg.push_str(&format!("\nUpdated: {}", diff.updated.join(", ")));
-    }
-    if diff.error_count > 0 {
-        msg.push_str(&format!(
-            "\n{} error{} during load.",
-            diff.error_count,
-            if diff.error_count == 1 { "" } else { "s" }
-        ));
-    }
-
-    msg
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -669,11 +579,4 @@ mod tests {
         assert!(out.contains("No plugins installed"));
     }
 
-    #[test]
-    fn format_reload_summary_basic() {
-        let reg = PluginRegistry::new();
-        let diff = ReloadDiff::default();
-        let out = format_reload_summary(&reg, &diff);
-        assert!(out.contains("Reloaded"));
-    }
 }

@@ -98,9 +98,11 @@ Verification:
 - targeted `cargo check`
 - targeted plugin lifecycle tests if touched
 
-Done when:
-- plugin scope is minimal and truthful
-- branch is committed and merged if changes are needed
+Status:
+- completed and merged into `main`
+- live plugin reload removed
+- marketplace surface removed
+- local plugin install/list/info/enable/disable kept as the honest core
 
 ## Phase 4: Final Verification
 
@@ -147,10 +149,8 @@ Done when:
 
 ## Immediate Execution Order
 
-1. decide whether `plugins` cleanup is still justified
-2. if yes, complete it and merge it to `main`
-3. run final verification
-4. perform final cleanup
+1. run final verification
+2. perform final cleanup
 
 ## Definition Of Completion
 
