@@ -1,17 +1,13 @@
 # Provider Foundation Agent
 
 - branch: `refactor/provider-foundation`
-- worktree: `.codex/worktrees/provider-foundation`
+- worktree: retired
 - ownership area: `core` and `api`
-- current task: define canonical provider behavior and remove Anthropic-first shared defaults
-- blockers: none
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- final status: completed and archived
+- result: canonical provider behavior established in the foundational layers
+- tests run: historical targeted provider-foundation verification completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- keep `llama.cpp` first-class
-- keep Anthropic best-effort only
-- do not expand provider breadth
-- keep abstraction cleanup bounded to real shared-runtime improvements
+- retained as a durable record of the foundation lane

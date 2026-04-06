@@ -1,6 +1,12 @@
 # Sub-Agent Handover Plan
 
-Purpose: break the refactor effort into bounded workstreams that can be handed to sub-agents with minimal overlap and a clear dependency order.
+Purpose: record the workstream split that was used during the refactor and preserve the handoff model as historical guidance rather than an active execution plan.
+
+Status:
+
+- historical
+- the first-wave and follow-up work described here has already been completed and merged
+- no sub-agent work is currently active in this repo
 
 This document assumes the target direction in:
 
@@ -8,7 +14,7 @@ This document assumes the target direction in:
 - [execution_roadmap.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/execution_roadmap.md)
 - [urgency_classification.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/urgency_classification.md)
 
-Local execution layout:
+Historical execution layout:
 
 - worktrees live under `.codex/worktrees/`
 - per-agent directives live under `.codex/agents/`
@@ -285,6 +291,19 @@ Suggested local files per agent:
 - if blocked by another workstream, stop and report the dependency instead of inventing a parallel contract
 - prefer small commits per fix cluster
 - keep file ownership clear when touching shared modules like `query` or `commands`
+
+## Historical Execution Outcome
+
+The handoff model above was used to complete the refactor in bounded waves:
+
+1. runtime safety
+2. removal of `bridge`, `acp`, and `buddy`
+3. provider foundation
+4. provider rollout
+5. provider breadth reduction
+6. plugin scope reduction
+
+All of those steps are now merged into `main`.
 
 ## Suggested First Handoffs
 

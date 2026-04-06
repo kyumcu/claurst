@@ -1,16 +1,29 @@
 # Branching And Worktree Strategy
 
-Purpose: define how implementation work should be split across branches and worktrees so the refactor stays reviewable, parallelizable, and recoverable.
+Purpose: record the branching/worktree model that was used during the refactor and describe the finished-state cleanup policy now that the main refactor work is merged.
+
+Status:
+
+- historical strategy retained for future large refactors
+- topic-branch execution is complete
+- local topic worktrees should be removed after merge
+- day-to-day work should happen directly on fresh branches from `main`
 
 ## Recommendation
 
-Use:
+For large refactors, use:
 
 - one integration branch
 - multiple small topic branches
 - one `git worktree` per active topic branch
 
 Do not use one giant refactor branch for the whole effort.
+
+For the current repo state:
+
+- the dedicated refactor worktrees are no longer needed
+- merged topic branches can be deleted locally
+- new work should start from `main` with fresh short-lived branches only when needed
 
 ## Why Not One Huge Branch
 
@@ -91,7 +104,7 @@ Optional follow-up branches:
 - `cleanup/provider-runtime-abstractions`
 - `fix/mcp-core-scope`
 
-## Recommended Worktree Layout
+## Historical Worktree Layout
 
 Suggested directories under `.codex/worktrees/`:
 
@@ -113,7 +126,7 @@ Map them like this:
 - `.codex/worktrees/provider-rollout` → `refactor/provider-rollout`
 - `.codex/worktrees/plugins` → `fix/plugins-core-only`
 
-Recommended coordination files:
+Tracked coordination files that remain as durable records:
 
 - `.codex/agents/integration.md`
 - `.codex/agents/remove.md`
@@ -187,9 +200,9 @@ Primary ownership:
 
 - [`src-rust/crates/plugins`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/plugins)
 
-## Merge Order
+## Historical Merge Order
 
-Recommended order into `refactor/llamacpp-first`:
+The refactor was merged in this order into `refactor/llamacpp-first`:
 
 1. `remove/bridge-acp-buddy`
 2. `fix/query-safety`
@@ -242,6 +255,15 @@ The integration branch should:
 - absorb one topic branch at a time
 - run verification after each merge
 - resolve cross-branch conflicts centrally
+
+## Finished-State Cleanup Policy
+
+After a refactor wave is merged:
+
+- remove the dedicated worktrees with `git worktree remove`
+- delete merged topic branches locally
+- keep tracked `.codex/agents/*.md` only as durable coordination records
+- avoid leaving `.codex/worktrees/` populated with stale historical checkouts
 
 ## Conflict Hotspots
 

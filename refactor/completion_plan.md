@@ -1,25 +1,24 @@
 # Refactor Completion Plan
 
-Purpose: define the shortest practical path from the current `main` state to a completed refactor, using one worktree at a time and no sub-agents.
+Purpose: record the path that was used to complete the refactor and define the small amount of cleanup that remains after completion.
 
 Current baseline:
 
-- `main` is at `c466424`
+- `main` is at `8d1a2d5`
 - `bridge`, `acp`, and `buddy` are already removed
 - query/tools safety fixes are already merged
 - provider foundation in `core` and `api` is already merged
 - provider rollout is already merged
 - provider breadth reduction is already merged
-- remaining prepared worktrees should be aligned to `main` before use
+- plugin scope reduction is already merged
+- final verification and active-path cleanup are already merged
+- no active worktrees are required for the completed refactor state
 
 ## Working Rules
 
-1. Use one worktree at a time.
-2. Make one coherent change set per lane.
-3. Run targeted verification before every commit.
-4. Merge each completed lane to `main` before starting the next one.
-5. Do not reopen removed subsystems.
-6. Keep `llama.cpp` first-class and Anthropic best-effort only.
+1. Keep `llama.cpp` first-class and Anthropic best-effort only.
+2. Do not reopen removed subsystems.
+3. Treat the topic-lane history below as archival context, not an active branching plan.
 
 ## Phase 1: Provider Rollout
 
@@ -52,6 +51,7 @@ Verification:
 
 Status:
 - completed and merged into `main`
+- landed before `d29afa8`
 
 ## Phase 2: Provider Breadth Reduction
 
@@ -80,6 +80,7 @@ Verification:
 
 Status:
 - completed and merged into `main`
+- landed before `c466424`
 
 ## Phase 3: Plugins Decision And Cleanup
 
@@ -103,6 +104,7 @@ Status:
 - live plugin reload removed
 - marketplace surface removed
 - local plugin install/list/info/enable/disable kept as the honest core
+- landed before `fa96395`
 
 ## Phase 4: Final Verification
 
@@ -129,10 +131,10 @@ Also verify:
 - no stale Anthropic-first UX defaults in active flows
 - no lower-priority provider surfaces that contradict the new scope
 
-Done when:
-- `main` is stable
-- the user-facing local path is coherent
-- the codebase behavior matches the vision docs
+Status:
+- completed and merged into `main`
+- full workspace checks passed
+- local `llama.cpp` happy-path verification passed against a live local endpoint
 
 ## Phase 5: Final Cleanup
 
@@ -144,13 +146,15 @@ Required work:
 - remove stale branches/worktree lanes if no longer needed
 - clean up obsolete comments or docs that still describe old behavior
 
-Done when:
-- repo docs and branch layout match the finished state
+Status:
+- completed for the active product path
+- remaining work, if any, is optional deeper dead-code cleanup rather than refactor-critical work
 
-## Immediate Execution Order
+## Current Remaining Work
 
-1. run final verification
-2. perform final cleanup
+1. optional deeper removal of unused provider modules/constants that no longer affect active behavior
+2. optional archival cleanup in `refactor/` if you want to shrink historical planning material
+3. normal maintenance on top of the completed local-first baseline
 
 ## Definition Of Completion
 
@@ -163,3 +167,8 @@ The refactor is complete when:
 - query/tools safety fixes remain intact
 - `main` passes verification
 - the live codebase behavior matches the vision in `refactor/codebase_vision.md`
+
+Current assessment:
+
+- complete for the intended `llama.cpp`-first refactor scope
+- suitable as the post-refactor baseline on `main`

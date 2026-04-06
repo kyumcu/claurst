@@ -1,16 +1,13 @@
 # Removal Agent
 
 - branch: `remove/bridge-acp-buddy`
-- worktree: `.codex/worktrees/remove`
-- ownership area: `bridge`, `acp`, `buddy`, and wiring that references them
-- current task: remove `bridge`, `acp`, and `buddy` while keeping the repo buildable
-- blockers: none
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- worktree: retired
+- ownership area: `bridge`, `acp`, `buddy`, and wiring that referenced them
+- final status: completed and archived
+- result: `bridge`, `acp`, and `buddy` were removed from the maintained product surface
+- tests run: historical targeted build/integration checks completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- remove code cleanly rather than stubbing it
-- do not add replacement complexity
-- if a dependency must move elsewhere, record it explicitly
+- retained as a durable record of the removal lane

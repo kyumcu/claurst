@@ -1,16 +1,13 @@
 # Provider Breadth Agent
 
 - branch: `simplify/provider-breadth`
-- worktree: `.codex/worktrees/provider-breadth`
+- worktree: retired
 - ownership area: provider registry/provider list cleanup across `core`, `api`, `commands`, and `tui`
-- current task: remove lower-priority providers that complicate the shared runtime
-- blockers: should align with provider-foundation decisions
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- final status: completed and archived
+- result: retained provider surface narrowed to the supported local-first set, with Anthropic kept best-effort only
+- tests run: historical targeted provider-registry and TUI checks completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- prune aggressively where maintenance cost is not justified
-- do not preserve low-value provider compatibility just for breadth
-- coordinate with provider-foundation on canonical provider policy
+- retained as a durable record of the provider-pruning lane

@@ -1,16 +1,13 @@
 # Plugins Agent
 
 - branch: `fix/plugins-core-only`
-- worktree: `.codex/worktrees/plugins`
+- worktree: retired
 - ownership area: `plugins`
-- current task: reduce plugin behavior to a reliable core
-- blockers: none
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- final status: completed and archived
+- result: plugins reduced to an honest local-only core; marketplace and fake live reload removed
+- tests run: historical targeted plugin and command checks completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- keep scope minimal and honest
-- do not expand marketplace complexity
-- favor correctness and clarity over feature breadth
+- retained as a durable record of the plugin-scope reduction lane

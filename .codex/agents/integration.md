@@ -1,16 +1,14 @@
 # Integration Agent
 
 - branch: `refactor/llamacpp-first`
-- worktree: `.codex/worktrees/integration`
+- worktree: retired
 - ownership area: integration merges, conflict resolution, verification
-- current task: hold the accepted refactor line and absorb completed topic branches
-- blockers: none
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- final status: completed and archived
+- result: topic branches were merged in order and the integrated refactor was landed on `main`
+- tests run: historical integration checks completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- do not do feature work directly here unless required for conflict resolution
-- merge topic branches in the documented dependency order
-- run verification after each merge
+- retained as a durable record of the integration lane
+- no active worktree is attached to this record

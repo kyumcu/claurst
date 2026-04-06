@@ -1,17 +1,13 @@
 # Provider Rollout Agent
 
 - branch: `refactor/provider-rollout`
-- worktree: `.codex/worktrees/provider-rollout`
+- worktree: retired
 - ownership area: `query`, `tui`, `commands`, and `cli`
-- current task: roll provider-foundation changes into the user-facing and runtime flow
-- blockers: depends on provider-foundation output
-- files changed: none yet
-- tests run: none yet
-- last review status: not run yet
+- final status: completed and archived
+- result: `llama.cpp` became the clean first-class user-facing path and Anthropic ceased to be the default UX path
+- tests run: historical targeted CLI/TUI/provider-flow checks completed during the refactor wave
+- last review status: archived
 
-Rules:
+Notes:
 
-- consume the provider-foundation contract, do not redefine it
-- make `llama.cpp` the clean first-class path
-- remove Anthropic-first UX/default behavior
-- only generalize internal types if they are blocking provider-neutral behavior
+- retained as a durable record of the rollout lane
