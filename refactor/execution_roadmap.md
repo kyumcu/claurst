@@ -13,6 +13,7 @@ This is not a design doc for every fix. It is a sequencing document.
 5. Prefer shrinking or disabling misleading optional surfaces over investing in broad partial support.
 6. Remove Anthropic-first defaults before investing in new provider breadth.
 7. Make shared runtime behavior provider-neutral before attempting full internal type/generalization cleanup.
+8. Prefer immediate removal over containment for subsystems that are no longer in scope.
 
 ## Phase 0: Stabilize the Safety Boundary
 
@@ -59,24 +60,24 @@ Expected outcome:
 
 ## Phase 1: Stop Silent Loss and State Drift
 
-Goal: make runtime state reliable across queueing, worktree, and plugin flows while preparing `bridge` for removal.
+Goal: make runtime state reliable across queueing, worktree, and plugin flows while removing out-of-scope subsystems immediately.
 
-### 1.1 Bridge containment before removal
+### 1.1 Immediate removal of `bridge`
 
 Source:
 - [bridge_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/bridge_review.md)
 
 Fix set:
-- decide whether any behavior must be preserved elsewhere before removal
-- contain the most dangerous failure modes only if the module must survive temporarily
-- stop investing in deeper bridge behavior beyond shutdown or migration needs
+- remove the crate and its wiring from the maintained product path
+- remove bridge-specific config, commands, and UI hooks
+- preserve only any migration note that is strictly required during deletion
 
 Why now:
-- bridge currently creates operational risk while no longer fitting the target product scope
-- the goal is to avoid spending large effort on a subsystem that should be deleted
+- bridge is out of scope and should not receive stabilization investment
+- immediate removal reduces surface area faster than containment work
 
 Expected outcome:
-- either a safe temporary bridge state or a clear path to removal
+- bridge is gone from the maintained product surface
 
 ### 1.2 Session-scoped worktree state
 
@@ -118,6 +119,21 @@ Decision gate after 1.4:
 - if plugins are not core to the product, stop after making the current behavior honest and stable
 - do not expand marketplace or reload breadth before the core local workflow is finished
 
+### 1.5 Immediate removal of `acp` and `buddy`
+
+Sources:
+- [acp_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/acp_review.md)
+- [buddy_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/buddy_review.md)
+
+Fix set:
+- remove `acp` crate wiring and user-facing entry points
+- remove `buddy` crate wiring, feature flags, and product-facing hooks
+- keep only the minimum migration cleanup needed for a clean build
+
+Why now:
+- both are out of scope
+- deletion is cheaper than continuing to design around them
+
 ## Phase 2: Canonicalize Provider Identity Everywhere
 
 Goal: eliminate the largest cross-cutting source of inconsistent behavior in the codebase.
@@ -146,6 +162,11 @@ Fix set:
 
 Primary modules:
 - `core`
+
+Provider policy for this phase:
+- keep `llama.cpp`
+- keep Anthropic only on a best-effort basis
+- allow lower-priority providers to be removed if they complicate the shared runtime
 
 ### 2.2 Make API/runtime lookup canonical
 
@@ -236,6 +257,7 @@ Expected phase outcome:
 - Anthropic remains supported
 - Anthropic is no longer the hidden product identity
 - `llama.cpp` becomes the clean first-class path in the actual behavior of the app
+- lower-priority providers no longer dictate shared runtime complexity
 
 ### 2.5.4 Hold the abstraction line
 
@@ -258,21 +280,6 @@ Examples that can wait:
 ## Phase 3: Make Reported Capabilities Match Runtime Truth
 
 Goal: stop interfaces from claiming support they do not actually provide.
-
-### 3.1 ACP removal plan
-
-Source:
-- [acp_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/acp_review.md)
-
-Fix set:
-- identify callers and codepaths that still depend on ACP
-- remove the fake session lifecycle instead of broadening it
-- remove misleading capability/reporting surface alongside the module
-- preserve only any thin compatibility layer that is absolutely required during transition
-
-Why here:
-- ACP is externally consumed, so removal needs to happen deliberately rather than by leaving a broken stub
-- it should be handled after the core runtime/provider layer is stabilized
 
 ### 3.2 Commands reporting truthfulness
 
@@ -302,19 +309,6 @@ Why here:
 Preferred lean outcome:
 - support only the MCP transports and routing patterns that are actually used
 - defer broader MCP capability breadth until the local-first core is complete
-
-### 3.4 Bridge removal plan
-
-Source:
-- [bridge_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/bridge_review.md)
-
-Fix set:
-- identify whether any user-visible flow still depends on bridge
-- remove bridge-specific config and API hooks that are no longer needed
-- avoid deep cleanup work that only matters if bridge remains a supported subsystem
-
-Why here:
-- bridge should be removed cleanly after the core path is stable enough that its absence is acceptable
 
 ## Phase 4: Metadata Quality and Lower-Risk Correctness
 
@@ -355,16 +349,6 @@ Fix set:
 - keep this tightly scoped to code that distorts behavior or blocks maintainability
 - avoid turning this into a full internal-renaming sweep
 
-### 4.4 Buddy removal plan
-
-Source:
-- [buddy_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/buddy_review.md)
-
-Fix set:
-- identify any remaining compile-time or runtime dependencies
-- remove buddy from the maintained product surface
-- only do persistence cleanup if required to support safe removal or migration
-
 ## Phase 5: Scope Reduction and Simplification
 
 Goal: remove or reduce parts of the codebase that add complexity without strengthening the local `llama.cpp` workflow.
@@ -379,16 +363,18 @@ Outcome:
 - one canonical provider system
 - fewer ad hoc compatibility branches
 
-### 5.2 Remove non-core subsystems
+### 5.2 Remove non-core subsystems and excess provider breadth
 
 Targets:
 - `acp`
 - `bridge`
 - `buddy`
+- lower-priority providers that complicate maintenance
 
 Outcome:
 - removed from the maintained product surface
 - no partially implemented contracts competing with the core runtime
+- provider support narrowed to what the team is willing to maintain
 
 ### 5.3 Keep plugins and MCP on a strict scope budget
 
@@ -440,10 +426,10 @@ Modules:
 - `api` runtime lookup fixes should land before `query` provider-construction cleanup is considered complete.
 - `query` compaction and stream-error fixes do not depend on provider canonicalization and should be done immediately.
 - `commands /providers` should wait until runtime provider truth is fixed in `core` and `api`.
-- ACP runtime-backed model/tool discovery should ideally wait until provider/tool truth surfaces are stabilized.
 - removal planning for `acp`, `bridge`, and `buddy` should happen before investing in any further feature work inside them.
 - removing Anthropic centrality should begin only after canonical provider behavior is defined, otherwise the fallback logic will just move around.
 - full internal provider-neutral abstraction cleanup should wait until the behavioral provider-neutral pass is complete, otherwise the refactor will balloon.
+- provider pruning should happen early if it simplifies the shared runtime materially.
 
 ## Fastest Risk-Reduction Order
 
@@ -452,15 +438,13 @@ If only a small number of fixes can be done now, use this order:
 1. `tools`: path-boundary enforcement.
 2. `query`: compaction failure preservation.
 3. `query`: stream error handling.
-4. contain `bridge` only enough to remove it safely.
-5. `core` + `api`: shared provider canonicalization foundation.
+4. remove `bridge`, `acp`, and `buddy`.
+5. `core` + `api`: shared provider canonicalization foundation and provider pruning.
 6. `query` + `tui` + `commands` + `cli`: provider canonicalization rollout.
 7. remove Anthropic-first defaults and make `llama.cpp` the clean first-class path.
 8. make shared runtime behavior provider-neutral where it affects real execution.
 9. `plugins`: real reload semantics.
-10. remove `acp` cleanly instead of broadening it.
-11. `mcp`: real transport support and OAuth completion correctness.
-12. remove `bridge` and `buddy` from the maintained product surface.
+10. `mcp`: real transport support and OAuth completion correctness.
 
 ## Completion Criterion
 
@@ -474,3 +458,4 @@ The refactor/reliability wave is in good shape when:
 - operational surfaces report actual runtime truth
 - plugin state survives transient failures without silent drift
 - `bridge`, `acp`, and `buddy` are removed from the maintained product surface
+- lower-priority providers are removed if they do not justify maintenance cost

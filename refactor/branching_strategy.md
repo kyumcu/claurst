@@ -1,0 +1,263 @@
+# Branching And Worktree Strategy
+
+Purpose: define how implementation work should be split across branches and worktrees so the refactor stays reviewable, parallelizable, and recoverable.
+
+## Recommendation
+
+Use:
+
+- one integration branch
+- multiple small topic branches
+- one `git worktree` per active topic branch
+
+Do not use one giant refactor branch for the whole effort.
+
+## Why Not One Huge Branch
+
+This refactor combines several independent but interacting changes:
+
+- immediate removal of `bridge`, `acp`, and `buddy`
+- query/runtime safety fixes
+- provider foundation cleanup
+- provider pruning
+- `llama.cpp`-first rollout
+- best-effort Anthropic compatibility
+
+If these land in one long-lived branch:
+
+- rebases get painful
+- review quality drops
+- failures become harder to localize
+- rollback gets harder
+- parallel work causes avoidable conflicts
+
+## Why Worktrees Fit This Refactor
+
+`git worktree` is a good fit because it lets you:
+
+- keep several active topic branches checked out at once
+- avoid stashing while switching streams
+- run builds/tests independently per stream
+- hand separate directories to sub-agents cleanly
+- isolate removal work from runtime work
+
+For this codebase, that is more practical than constantly switching one checkout.
+
+## Target Model
+
+### 1. Integration branch
+
+Create one long-lived branch that represents the current accepted state of the refactor.
+
+Suggested name:
+
+- `refactor/llamacpp-first`
+
+This branch should only receive:
+
+- completed topic branches
+- conflict resolution
+- integration verification
+
+It should not become the place where all work happens directly.
+
+### 2. Topic branches
+
+Each major change area should get its own branch with a narrow purpose.
+
+Suggested branches:
+
+- `remove/bridge-acp-buddy`
+- `fix/query-safety`
+- `refactor/provider-foundation`
+- `simplify/provider-breadth`
+- `refactor/provider-rollout`
+- `fix/plugins-core-only`
+
+Optional follow-up branches:
+
+- `cleanup/provider-runtime-abstractions`
+- `fix/mcp-core-scope`
+
+## Recommended Worktree Layout
+
+Suggested sibling directories:
+
+- `../claurst-integration`
+- `../claurst-remove`
+- `../claurst-runtime`
+- `../claurst-provider-foundation`
+- `../claurst-provider-rollout`
+- `../claurst-plugins`
+
+Map them like this:
+
+- `../claurst-integration` → `refactor/llamacpp-first`
+- `../claurst-remove` → `remove/bridge-acp-buddy`
+- `../claurst-runtime` → `fix/query-safety`
+- `../claurst-provider-foundation` → `refactor/provider-foundation`
+- `../claurst-provider-rollout` → `refactor/provider-rollout`
+- `../claurst-plugins` → `fix/plugins-core-only`
+
+## Ownership Guidance
+
+To reduce conflicts, keep branch ownership aligned with module boundaries.
+
+### Branch: `remove/bridge-acp-buddy`
+
+Primary ownership:
+
+- [`src-rust/crates/bridge`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/bridge)
+- [`src-rust/crates/acp`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/acp)
+- [`src-rust/crates/buddy`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/buddy)
+- entrypoint/config wiring that references them
+
+### Branch: `fix/query-safety`
+
+Primary ownership:
+
+- [`src-rust/crates/query`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/query)
+- [`src-rust/crates/tools`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/tools)
+
+### Branch: `refactor/provider-foundation`
+
+Primary ownership:
+
+- [`src-rust/crates/core`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/core)
+- [`src-rust/crates/api`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/api)
+
+### Branch: `simplify/provider-breadth`
+
+Primary ownership:
+
+- provider registry and provider list cleanup in:
+  - [`src-rust/crates/core`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/core)
+  - [`src-rust/crates/api`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/api)
+  - [`src-rust/crates/commands`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/commands)
+  - [`src-rust/crates/tui`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/tui)
+
+### Branch: `refactor/provider-rollout`
+
+Primary ownership:
+
+- [`src-rust/crates/query`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/query)
+- [`src-rust/crates/tui`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/tui)
+- [`src-rust/crates/commands`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/commands)
+- [`src-rust/crates/cli`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/cli)
+
+### Branch: `fix/plugins-core-only`
+
+Primary ownership:
+
+- [`src-rust/crates/plugins`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/plugins)
+
+## Merge Order
+
+Recommended order into `refactor/llamacpp-first`:
+
+1. `remove/bridge-acp-buddy`
+2. `fix/query-safety`
+3. `refactor/provider-foundation`
+4. `simplify/provider-breadth`
+5. `refactor/provider-rollout`
+6. `fix/plugins-core-only`
+
+Optional later:
+
+7. `fix/mcp-core-scope`
+8. `cleanup/provider-runtime-abstractions`
+
+## Why This Order
+
+### 1. Remove dead surface first
+
+This immediately lowers maintenance load and prevents wasted effort on deleted modules.
+
+### 2. Stabilize runtime safety early
+
+No point doing elegant provider work if query/tool behavior can still corrupt sessions.
+
+### 3. Build provider foundation before UI rollout
+
+The rollout work should consume one shared provider contract, not invent a second one.
+
+### 4. Prune providers before finishing rollout
+
+If lower-priority providers are going away, remove them before polishing UI and command behavior around them.
+
+### 5. Roll out `llama.cpp`-first behavior after the foundation is stable
+
+This keeps the user-facing changes aligned with the new core behavior.
+
+## Rebase And Integration Policy
+
+### Topic branches
+
+Topic branches should:
+
+- rebase regularly onto `refactor/llamacpp-first`
+- stay focused
+- avoid unrelated cleanup
+
+### Integration branch
+
+The integration branch should:
+
+- absorb one topic branch at a time
+- run verification after each merge
+- resolve cross-branch conflicts centrally
+
+## Conflict Hotspots
+
+These files or crates are likely to see overlap and should be coordinated carefully:
+
+- [`src-rust/crates/query`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/query)
+- [`src-rust/crates/core`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/core)
+- [`src-rust/crates/api`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/api)
+- [`src-rust/crates/tui`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/tui)
+- [`src-rust/crates/commands`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/commands)
+- [`src-rust/crates/cli`](/home/manager/Agents/temp/toolsTest/claude/claurst/src-rust/crates/cli)
+
+Rules:
+
+- avoid parallel edits to `core` and `api` across multiple branches where possible
+- let `provider-foundation` define the provider contract
+- let `provider-rollout` consume it rather than reshape it
+
+## Worktree Operating Rules
+
+1. One branch per worktree.
+2. One main responsibility per worktree.
+3. Do not mix unrelated fixes in a worktree just because the files are open.
+4. Run verification inside the worktree that owns the change.
+5. Delete worktrees once their branches are merged.
+
+## Suggested Commands
+
+Example setup:
+
+```bash
+git switch -c refactor/llamacpp-first
+git worktree add ../claurst-integration refactor/llamacpp-first
+
+git worktree add -b remove/bridge-acp-buddy ../claurst-remove HEAD
+git worktree add -b fix/query-safety ../claurst-runtime HEAD
+git worktree add -b refactor/provider-foundation ../claurst-provider-foundation HEAD
+git worktree add -b simplify/provider-breadth ../claurst-provider-breadth HEAD
+git worktree add -b refactor/provider-rollout ../claurst-provider-rollout HEAD
+git worktree add -b fix/plugins-core-only ../claurst-plugins HEAD
+```
+
+## Decision Summary
+
+Best strategy for this refactor:
+
+- not one giant branch
+- not many unrelated edits in one checkout
+- yes to multiple small branches
+- yes to worktrees
+- yes to one integration branch
+
+Short version:
+
+Use topic branches with worktrees, and merge them into one staged integration branch in dependency order.

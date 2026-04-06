@@ -11,7 +11,7 @@ Build a lean, local-first coding agent where `llama.cpp` is the clean first-clas
 The product should optimize for:
 
 - first-class `llama.cpp` support
-- Anthropic as optional support, not product identity
+- Anthropic as best-effort optional support, not product identity
 - reliable local usage
 - a small but high-quality feature set
 - tools that work consistently
@@ -37,6 +37,12 @@ The user should be able to:
 4. use a core set of tools safely
 5. trust that the UI, commands, and runtime all describe the same state
 6. use Anthropic if desired, without the rest of the app assuming it is the default
+
+Compatibility target:
+
+- `llama.cpp` is the quality bar
+- Anthropic is best-effort compatibility
+- lower-priority providers may be removed
 
 ## Design Principles
 
@@ -78,6 +84,12 @@ Over:
 - broad provider matrices with alias drift
 - half-working remote features
 - many commands that expose inconsistent runtime state
+
+This refactor explicitly allows:
+
+- dropping lower-priority providers
+- temporary degradation during the transition
+- aggressive simplification when it improves the local-first core
 
 ### 3. Runtime truth over surface polish
 
@@ -182,6 +194,7 @@ These should not drive the codebase until the core is solid:
 
 - maximizing provider count
 - keeping Anthropic as a hidden default in architecture or UX
+- preserving low-value provider breadth during the refactor
 - keeping every integration surface equally feature-rich
 - adding more commands before fixing state correctness
 - polishing advanced remote features before local reliability is solved
@@ -213,6 +226,7 @@ These may remain, but they should not complicate the core path and should be red
 
 - `mcp`
 - `plugins`
+- Anthropic provider support
 
 ### Removal targets
 
@@ -230,6 +244,7 @@ The codebase should be made leaner by:
 - shrinking partially implemented integration surfaces to the features they truly support
 - removing non-core subsystems that do not strengthen the local-first workflow
 - preferring removal over carrying misleading half-implemented behavior
+- dropping lower-priority providers that do not justify maintenance cost
 
 ## Keep / Shrink / Defer Guidance
 
@@ -242,11 +257,13 @@ The codebase should be made leaner by:
 - the small control surface around `/connect`, `/model`, `/providers`, `/status`, and `/config`
 - provider-neutral runtime abstractions
 - behaviorally provider-neutral shared runtime
+- best-effort Anthropic compatibility only where it is cheap to retain
 
 ### Shrink aggressively
 
 - provider alias branches spread across multiple crates
 - Anthropic-first defaults in model choice, auth bootstrap, onboarding, and command behavior
+- lower-priority provider support that complicates the shared runtime
 - plugin reload and marketplace complexity unless it is made trustworthy
 - MCP breadth beyond the transport and routing modes actually used
 - command and reporting surfaces that claim more than they can verify live
@@ -257,6 +274,7 @@ The codebase should be made leaner by:
 - remote bridge functionality
 - ACP session and editor-integration surface
 - peripheral subsystems like `buddy`
+- lower-priority providers that do not support the `llama.cpp`-first vision
 
 ### Defer
 
@@ -301,6 +319,7 @@ Everything else should be secondary to this path:
 - reliable `llama.cpp` local flow
 - remove Anthropic as the implicit default path in config, onboarding, and runtime selection
 - make shared runtime behavior provider-neutral before attempting total internal type cleanup
+- reduce provider breadth to what the team is willing to maintain
 
 ### Priority 3: truthful interfaces
 
@@ -323,6 +342,7 @@ Everything else should be secondary to this path:
 ### Priority 5: reduce unnecessary surface area
 
 - remove `bridge`, `acp`, and `buddy`
+- drop lower-priority providers that add complexity without serving the main product path
 - remove misleading compatibility and reporting layers
 - cut breadth that does not raise the quality of the basic workflow
 
@@ -334,10 +354,12 @@ The codebase is meaningfully aligned with this vision when:
 2. No core runtime path can silently destroy or corrupt conversation state.
 3. No tool can mutate files outside approved roots.
 4. Anthropic support exists only as an explicit provider choice, not as the hidden default identity of the app.
-5. `bridge`, `acp`, and `buddy` are no longer on the critical path and are removed from the maintained product surface.
-6. Provider identity is canonical across config, auth, UI, runtime, and commands.
-7. Commands and external interfaces report actual runtime truth.
-8. The supported feature set is smaller, clearer, and more reliable than before.
+5. Anthropic remains, if at all, on a best-effort basis and does not distort the core product path.
+6. `bridge`, `acp`, and `buddy` are removed from the maintained product surface.
+7. Lower-priority providers that complicate the runtime are removed.
+8. Provider identity is canonical across config, auth, UI, runtime, and commands.
+9. Commands and external interfaces report actual runtime truth.
+10. The supported feature set is smaller, clearer, and more reliable than before.
 
 ## Practical Decision Rule
 

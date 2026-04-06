@@ -15,6 +15,8 @@ This document assumes the target direction in:
 3. Do foundation work before rollout work.
 4. Keep write scopes disjoint where possible.
 5. Prefer honest blocking reports over parallel reinvention.
+6. Remove out-of-scope subsystems immediately rather than stabilizing them.
+7. Keep Anthropic only on a best-effort basis and prioritize `llama.cpp`.
 
 ## Agent 1: Runtime Stabilization
 
@@ -69,6 +71,7 @@ Create one canonical provider system in the foundational layers and remove Anthr
 - fix local/private endpoint classification for OpenAI-compatible providers
 - remove Anthropic as the hidden default fallback for unrelated providers where shared foundation code currently assumes it
 - make shared foundation behavior provider-neutral without forcing a total internal type rename
+- remove lower-priority providers where doing so materially simplifies shared runtime behavior
 
 ### Why separate
 
@@ -120,7 +123,7 @@ This agent should start only after Agent 2 has defined the shared provider behav
 
 ### Goal
 
-Make exposed interfaces and operational reporting match the actual runtime.
+Make exposed interfaces and operational reporting match the actual runtime, with ACP removed rather than repaired.
 
 ### Ownership
 
@@ -173,6 +176,7 @@ This is easier to do correctly once the team knows what the stable core should l
 
 - those three subsystems removed cleanly
 - less surface area competing with the local-first core
+- lower-priority provider breadth reduced where it does not justify maintenance cost
 
 ## Dependency Order
 
@@ -180,6 +184,7 @@ This is easier to do correctly once the team knows what the stable core should l
 
 - Agent 1: Runtime Stabilization
 - Agent 2: Provider Foundation
+- Agent 5: Scope Reduction
 
 ### Should wait for foundation output
 
@@ -212,6 +217,7 @@ Focus:
 - auth/base URL/default-model foundation
 - removing Anthropic-first shared defaults
 - bounded provider-neutral behavior in shared foundation code
+- provider pruning where it materially simplifies the core runtime
 
 ### Workstream C
 
@@ -238,6 +244,7 @@ Focus:
 
 Focus:
 - removing non-core subsystems
+- immediate deletion of `bridge`, `acp`, and `buddy`
 
 ## Handover Template
 
@@ -263,6 +270,7 @@ Suggested output format from each sub-agent:
 - do not redefine shared provider behavior outside the provider-foundation workstream
 - do not introduce new Anthropic-first defaults while fixing provider logic
 - do not turn provider cleanup into a repo-wide internal renaming effort unless it directly improves shared runtime behavior
+- do prune low-priority providers if that materially reduces shared-runtime complexity
 - if blocked by another workstream, stop and report the dependency instead of inventing a parallel contract
 - prefer small commits per fix cluster
 - keep file ownership clear when touching shared modules like `query` or `commands`
@@ -279,20 +287,30 @@ Assign Agent 1:
 
 ### Second handoff
 
+Assign Agent 5:
+
+- remove `bridge`
+- remove `acp`
+- remove `buddy`
+- keep the repo buildable without them
+
+### Third handoff
+
 Assign Agent 2:
 
 - define canonical provider normalization
 - fix auth/env/default-model/base URL resolution in `core` and `api`
 - remove hidden Anthropic-first shared fallbacks
 - keep abstraction cleanup bounded to places where it improves real shared behavior
+- drop lower-priority providers where they complicate the shared runtime
 
-### Third handoff
+### Fourth handoff
 
 Assign Agent 1 or a follow-up stabilization worker:
 
 - finish worktree session isolation
 
-### Fourth handoff
+### Fifth handoff
 
 Assign Agent 3:
 
@@ -301,6 +319,6 @@ Assign Agent 3:
 - remove Anthropic-first UX and default-selection behavior
 - only generalize internal types if they are actively blocking provider-neutral behavior
 
-### Fifth handoff
+### Sixth handoff
 
-Assign Agent 4 and Agent 5 as lower-priority parallel tracks after the core path is stable, with explicit removal of `acp`, `bridge`, and `buddy`.
+Assign Agent 4 as a lower-priority follow-up track after the core path is stable.
