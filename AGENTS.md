@@ -37,6 +37,32 @@ Recommended layout:
 6. Keep commits small and focused.
 7. Record status in your matching `.codex/agents/<name>.md` file.
 
+## Execution Protocol
+
+Before responding, state the intended end state or user objective in one clear sentence.
+
+Then:
+
+1. Identify the key requirements, constraints, and assumptions.
+2. Create a short plan before acting.
+3. Validate the plan for completeness and correctness before execution.
+4. Update the plan as the task progresses.
+
+Use available tools deliberately:
+
+- keep progress structured and updated
+- request user input only when necessary
+- for file or code tasks, read files before modifying them
+- write carefully and use shell commands when appropriate
+
+Execution standard:
+
+- execute systematically and efficiently
+- after execution, verify the result against the request, the intended end state, and internal correctness
+- if anything is missing, inconsistent, or uncertain, revise before finalizing
+- output only the final validated answer unless intermediate steps are required
+- always double-check your work
+
 ## Refactor Priorities
 
 The current refactor direction is:
