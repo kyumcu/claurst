@@ -1,6 +1,5 @@
 // app.rs — App state struct and main event loop.
 
-use crate::bridge_state::BridgeConnectionState;
 use crate::context_viz::ContextVizState;
 use crate::dialog_select::{DialogSelectState, SelectItem};
 use crate::export_dialog::{ExportDialogState, ExportFormat};
@@ -656,16 +655,12 @@ pub struct App {
     pub message_selector: MessageSelectorOverlay,
     /// Multi-step rewind flow overlay.
     pub rewind_flow: RewindFlowOverlay,
-    /// Bridge connection state.
-    pub bridge_state: BridgeConnectionState,
     /// Active notification queue.
     pub notifications: NotificationQueue,
     /// Plugin hint banners.
     pub plugin_hints: Vec<PluginHintBanner>,
     /// Optional session title shown in the status bar.
     pub session_title: Option<String>,
-    /// Remote session URL (set when bridge connects; readable by commands).
-    pub remote_session_url: Option<String>,
     /// Live MCP manager snapshot source when available.
     pub mcp_manager: Option<Arc<claurst_mcp::McpManager>>,
     /// Queued request for a real MCP reconnect from the interactive loop.
@@ -1102,11 +1097,9 @@ impl App {
             global_search: GlobalSearchState::default(),
             message_selector: MessageSelectorOverlay::new(),
             rewind_flow: RewindFlowOverlay::new(),
-            bridge_state: BridgeConnectionState::Disconnected,
             notifications: NotificationQueue::new(),
             plugin_hints: Vec::new(),
             session_title: None,
-            remote_session_url: None,
             mcp_manager: None,
             pending_mcp_reconnect: false,
             file_history: None,

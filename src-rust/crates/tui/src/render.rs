@@ -213,49 +213,6 @@ fn startup_notice_lines(app: &App, width: u16) -> Vec<Line<'static>> {
         ]));
     }
 
-    match &app.bridge_state {
-        crate::bridge_state::BridgeConnectionState::Connected { peer_count, .. } => {
-            let label = if *peer_count > 0 {
-                format!("Remote session active \u{00b7} {} peer{}", peer_count, if *peer_count == 1 { "" } else { "s" })
-            } else {
-                "Remote session active".to_string()
-            };
-            lines.push(Line::from(vec![
-                Span::styled(" remote ", Style::default().fg(CLAUDE_ORANGE)),
-                Span::styled(label, Style::default().fg(Color::DarkGray)),
-            ]));
-        }
-        crate::bridge_state::BridgeConnectionState::Reconnecting { attempt } => {
-            lines.push(Line::from(vec![
-                Span::styled(" remote ", Style::default().fg(Color::Yellow)),
-                Span::styled(
-                    format!("Reconnecting remote session (attempt #{attempt})"),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]));
-        }
-        crate::bridge_state::BridgeConnectionState::Failed { reason } => {
-            lines.push(Line::from(vec![
-                Span::styled(" remote ", Style::default().fg(Color::Red)),
-                Span::styled(
-                    truncate_end(reason, max_width),
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ]));
-        }
-        _ => {}
-    }
-
-    if let Some(url) = app.remote_session_url.as_deref() {
-        lines.push(Line::from(vec![
-            Span::styled(" link ", Style::default().fg(CLAUDE_ORANGE)),
-            Span::styled(
-                truncate_end(url, max_width),
-                Style::default().fg(Color::DarkGray),
-            ),
-        ]));
-    }
-
     // Home-directory warning: mirrors TS feedConfigs.tsx warningText.
     // "Note: You have launched claude in your home directory. For the best
     //  experience, launch it in a project directory instead."
@@ -2139,13 +2096,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             ));
         }
 
-        // 8. Bridge badge
-        if let Some(badge) = app.bridge_state.status_badge(app.frame_count) {
-            if !parts.is_empty() {
-                parts.push(Span::raw("  "));
-            }
-            parts.push(badge);
-        } else if app.pending_mcp_reconnect {
+        if app.pending_mcp_reconnect {
             if !parts.is_empty() {
                 parts.push(Span::raw("  "));
             }
@@ -2435,7 +2386,6 @@ pub struct StatusLineData {
     pub cost_cents: f64,
     pub compact_warning_pct: Option<f64>,  // None = no warning; Some(pct) = show warning
     pub vim_mode: Option<String>,           // None = no vim mode; Some("NORMAL") etc.
-    pub bridge_connected: bool,
     pub session_id: Option<String>,
     pub worktree: Option<String>,
     pub agent_badge: Option<String>,
@@ -2516,14 +2466,6 @@ pub fn render_full_status_line(data: &StatusLineData, area: Rect, buf: &mut rata
             Style::default().fg(Color::Magenta),
         ));
         spans.push(Span::styled(" ", Style::default()));
-    }
-
-    // Bridge connected
-    if data.bridge_connected {
-        spans.push(Span::styled(
-            "ðŸ”— ",
-            Style::default().fg(Color::Green),
-        ));
     }
 
     // Session ID

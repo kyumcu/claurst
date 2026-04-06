@@ -67,7 +67,6 @@ pub mod notice_ids {
     pub const COMPACT_WARNING: &str = "compact-warning";
     pub const COMPACT_CRITICAL: &str = "compact-critical";
     pub const RATE_LIMIT: &str = "rate-limit";
-    pub const BRIDGE_DISCONNECTED: &str = "bridge-disconnected";
     pub const HOOK_ERROR: &str = "hook-error";
     pub const MAX_TOKENS_HIT: &str = "max-tokens-hit";
     pub const NEW_VERSION: &str = "new-version";

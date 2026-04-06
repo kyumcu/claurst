@@ -827,8 +827,6 @@ pub mod config {
         pub version: Option<u32>,
         #[serde(default)]
         pub projects: HashMap<String, ProjectSettings>,
-        #[serde(default, rename = "remoteControlAtStartup")]
-        pub remote_control_at_startup: bool,
         /// Persisted permission rules saved by the user across sessions.
         #[serde(default, rename = "permissionRules")]
         pub permission_rules: Vec<crate::permissions::SerializedPermissionRule>,
@@ -1289,7 +1287,6 @@ pub mod config {
                 config: merged_config,
                 version: over.version.or(base.version),
                 projects: merge_map(base.projects, over.projects),
-                remote_control_at_startup: over.remote_control_at_startup || base.remote_control_at_startup,
                 permission_rules: { let mut v = base.permission_rules; v.extend(over.permission_rules); v },
                 enabled_plugins: { let mut s = base.enabled_plugins; s.extend(over.enabled_plugins); s },
                 disabled_plugins: { let mut s = base.disabled_plugins; s.extend(over.disabled_plugins); s },
@@ -1815,8 +1812,7 @@ pub mod permissions {
     // PermissionManager
     // -----------------------------------------------------------------------
 
-    /// Pending permission request waiting for resolution (e.g. from a bridge
-    /// remote peer or the interactive TUI dialog).
+    /// Pending permission request waiting for resolution.
     pub struct PendingPermission {
         pub tool_use_id: String,
         pub created_at: std::time::Instant,
@@ -2027,7 +2023,7 @@ pub mod permissions {
 
         /// Register a pending permission and return a receiver.  The caller
         /// awaits the receiver and gets a `PermissionDecision` when the user
-        /// (or a bridge peer) resolves the request.
+        /// Another actor resolves the request.
         pub fn register_pending(
             &mut self,
             id: String,
@@ -2420,9 +2416,6 @@ pub mod history {
         /// Message index in the parent session at which this branch was created.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub branch_at_message: Option<usize>,
-        /// Remote bridge URL if this session is mirrored to a remote endpoint.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub remote_session_url: Option<String>,
         /// Accumulated USD cost for this session.
         #[serde(default)]
         pub total_cost: f64,
@@ -2454,7 +2447,6 @@ pub mod history {
                 tags: vec![],
                 branch_from: None,
                 branch_at_message: None,
-                remote_session_url: None,
                 total_cost: 0.0,
                 total_tokens: 0,
                 checkpoints: vec![],
@@ -2634,7 +2626,6 @@ pub mod history {
             tags: source.tags.clone(),
             branch_from: Some(source_id.to_string()),
             branch_at_message: Some(clamped_idx),
-            remote_session_url: None,
             total_cost: 0.0,
             total_tokens: 0,
             checkpoints: vec![],

@@ -8,11 +8,8 @@ members = [
     "crates/tui",
     "crates/commands",
     "crates/mcp",
-    "crates/bridge",
     "crates/cli",
-    "crates/buddy",
     "crates/plugins",
-    "crates/acp",
 ]
 
 [workspace.package]
@@ -102,13 +99,10 @@ schemars = { version = "0.8", features = ["derive"] }
 
 # Workspace crates
 claurst-core = { path = "crates/core" }
-claurst-acp = { path = "crates/acp" }
 claurst-api = { path = "crates/api" }
 claurst-tools = { path = "crates/tools" }
 claurst-query = { path = "crates/query" }
 claurst-tui = { path = "crates/tui" }
 claurst-commands = { path = "crates/commands" }
 claurst-mcp = { path = "crates/mcp" }
-claurst-bridge = { path = "crates/bridge" }
-claurst-buddy = { path = "crates/buddy" }
 claurst-plugins = { path = "crates/plugins" }
