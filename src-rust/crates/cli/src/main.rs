@@ -576,7 +576,7 @@ async fn main() -> anyhow::Result<()> {
     // providers with saved credentials from /connect. This is local-first and
     // should not assume Anthropic is the default runtime path.
     let provider_registry =
-        claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config);
+        claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config, Some(&config));
 
     // Build tools
     // Interactive mode uses InteractivePermissionHandler which allows writes in Default mode
@@ -915,7 +915,7 @@ async fn refresh_provider_runtime_state(
             .context("Failed to rebuild Anthropic client")?,
     );
     let provider_registry = Arc::new(
-        claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config),
+        claurst_api::ProviderRegistry::from_environment_with_auth_store(client_config, Some(&config)),
     );
     let model_registry = load_cached_model_registry();
 

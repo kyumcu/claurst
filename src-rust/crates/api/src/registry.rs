@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use claurst_core::config::Config;
 use claurst_core::ProviderId;
 
 use crate::client::ClientConfig;
@@ -154,12 +155,12 @@ impl ProviderRegistry {
     /// registered as a best-effort fallback.
     ///
     /// This is the recommended constructor for production use.
-    pub fn from_environment(anthropic_config: ClientConfig) -> Self {
+    pub fn from_environment(anthropic_config: ClientConfig, config: Option<&Config>) -> Self {
         let mut registry = Self::with_anthropic(anthropic_config);
         registry
             .with_openai_if_key_set()
             .with_google_if_key_set()
-            .with_available_providers();
+            .with_available_providers(config);
         registry.set_default(ProviderId::new(ProviderId::LLAMA_CPP));
         registry
     }
@@ -173,9 +174,12 @@ impl ProviderRegistry {
     /// adds any extra providers that have keys in the auth store.
     ///
     /// [`AuthStore`]: claurst_core::AuthStore
-    pub fn from_environment_with_auth_store(anthropic_config: ClientConfig) -> Self {
+    pub fn from_environment_with_auth_store(
+        anthropic_config: ClientConfig,
+        config: Option<&Config>,
+    ) -> Self {
         // Start with env-based registration.
-        let mut registry = Self::from_environment(anthropic_config);
+        let mut registry = Self::from_environment(anthropic_config, config);
 
         // Now check the auth store for providers that weren't registered from
         // env vars.
@@ -214,13 +218,25 @@ impl ProviderRegistry {
     /// registered here.
     ///
     /// Returns `&mut self` for builder chaining.
-    pub fn with_available_providers(&mut self) -> &mut Self {
+    pub fn with_available_providers(&mut self, config: Option<&Config>) -> &mut Self {
         use crate::providers::openai_compat_providers as p;
 
+        let provider_host = |provider_id: &str, env_var: &str| -> Option<String> {
+            config
+                .and_then(|cfg| cfg.provider_configs.get(provider_id))
+                .and_then(|pc| pc.api_base.as_deref())
+                .map(|base| base.trim_end_matches("/v1").trim_end_matches('/').to_string())
+                .or_else(|| std::env::var(env_var).ok())
+        };
+
         // Local providers — always try to register.
-        self.register(Arc::new(p::ollama()));
-        self.register(Arc::new(p::lm_studio()));
-        self.register(Arc::new(p::llama_cpp()));
+        let ollama_host = provider_host(ProviderId::OLLAMA, "OLLAMA_HOST");
+        let lm_studio_host = provider_host(ProviderId::LM_STUDIO, "LM_STUDIO_HOST");
+        let llama_cpp_host = provider_host(ProviderId::LLAMA_CPP, "LLAMA_CPP_HOST");
+
+        self.register(Arc::new(p::ollama(ollama_host.as_deref())));
+        self.register(Arc::new(p::lm_studio(lm_studio_host.as_deref())));
+        self.register(Arc::new(p::llama_cpp(llama_cpp_host.as_deref())));
         self
     }
 }

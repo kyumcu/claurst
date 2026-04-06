@@ -75,7 +75,7 @@ pub use types::{
     ContentBlock, ImageSource, DocumentSource, CitationsConfig, Message, MessageContent,
     MessageCost, Role, ToolDefinition, ToolResultContent, UsageInfo,
 };
-pub use config::{AgentDefinition, Config, CommandTemplate, FormatterConfig, McpServerConfig, OutputFormat, PermissionMode, ProviderConfig, Settings, SkillsConfig, Theme, default_agents, strip_jsonc_comments, substitute_env_vars};
+pub use config::{AgentDefinition, Config, CommandTemplate, FormatterConfig, McpServerConfig, OutputFormat, PermissionMode, ProviderConfig, Settings, SkillsConfig, Theme, WebSearchConfig, default_agents, strip_jsonc_comments, substitute_env_vars};
 
 // Skill discovery: filesystem and git URL skill loading.
 pub mod skill_discovery;
@@ -698,6 +698,19 @@ pub mod config {
         }
     }
 
+    #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct WebSearchConfig {
+        /// Preferred search backend ("google", "brave", or "duckduckgo").
+        pub provider: Option<String>,
+        /// Provider API key. Used by Google Custom Search and Brave Search.
+        #[serde(default, alias = "googleApiKey", alias = "braveApiKey")]
+        pub api_key: Option<String>,
+        /// Provider engine identifier. Used by Google Custom Search.
+        #[serde(default, alias = "googleCx")]
+        pub engine_id: Option<String>,
+    }
+
     // ---- Config ----------------------------------------------------------
 
     /// Top-level configuration values, merged from CLI args + settings file + env.
@@ -751,6 +764,9 @@ pub mod config {
         /// Skill-discovery configuration (copied from Settings on load).
         #[serde(default)]
         pub skills: SkillsConfig,
+        /// Web search backend configuration used by the WebSearch tool.
+        #[serde(default)]
+        pub web_search: WebSearchConfig,
         /// Optional URL for the session-share service.  When set, `/share`
         /// POSTs the session to this endpoint and returns the resulting URL.
         /// When absent, `/share` falls back to a local Markdown export.
@@ -1323,6 +1339,19 @@ pub mod config {
                     let mut urls = base.config.skills.urls;
                     for u in over.config.skills.urls { if !urls.contains(&u) { urls.push(u); } }
                     SkillsConfig { paths, urls }
+                },
+                web_search: WebSearchConfig {
+                    provider: over.config.web_search.provider.or(base.config.web_search.provider),
+                    api_key: over
+                        .config
+                        .web_search
+                        .api_key
+                        .or(base.config.web_search.api_key),
+                    engine_id: over
+                        .config
+                        .web_search
+                        .engine_id
+                        .or(base.config.web_search.engine_id),
                 },
                 share_endpoint: over.config.share_endpoint.or(base.config.share_endpoint),
             };

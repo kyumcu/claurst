@@ -877,13 +877,13 @@ pub async fn run_query_loop(
                     let overridden: Option<std::sync::Arc<dyn claurst_api::LlmProvider>> =
                         match provider_id_str.as_str() {
                             "ollama" => Some(std::sync::Arc::new(
-                                openai_compat_providers::ollama().with_base_url(base_url),
+                                openai_compat_providers::ollama(None).with_base_url(base_url),
                             )),
                             "lmstudio" | "lm-studio" => Some(std::sync::Arc::new(
-                                openai_compat_providers::lm_studio().with_base_url(base_url),
+                                openai_compat_providers::lm_studio(None).with_base_url(base_url),
                             )),
                             "llamacpp" | "llama-cpp" => Some(std::sync::Arc::new(
-                                openai_compat_providers::llama_cpp().with_base_url(base_url),
+                                openai_compat_providers::llama_cpp(None).with_base_url(base_url),
                             )),
                             _ => None,
                         };

@@ -16,9 +16,11 @@ use super::openai_compat::{OpenAiCompatProvider, ProviderQuirks};
 
 /// Ollama — local inference server.
 /// Reads `OLLAMA_HOST` for the base URL; defaults to `http://localhost:11434`.
-pub fn ollama() -> OpenAiCompatProvider {
-    let host = std::env::var("OLLAMA_HOST")
-        .unwrap_or_else(|_| "http://localhost:11434".to_string());
+pub fn ollama(host_override: Option<&str>) -> OpenAiCompatProvider {
+    let host = host_override
+        .map(str::to_string)
+        .or_else(|| std::env::var("OLLAMA_HOST").ok())
+        .unwrap_or_else(|| "http://localhost:11434".to_string());
     let base_url = format!("{}/v1", host.trim_end_matches('/'));
     OpenAiCompatProvider::new(ProviderId::OLLAMA, "Ollama", base_url).with_quirks(
         ProviderQuirks {
@@ -33,9 +35,11 @@ pub fn ollama() -> OpenAiCompatProvider {
 
 /// LM Studio — local OpenAI-compatible server.
 /// Reads `LM_STUDIO_HOST` for the base URL; defaults to `http://localhost:1234`.
-pub fn lm_studio() -> OpenAiCompatProvider {
-    let host = std::env::var("LM_STUDIO_HOST")
-        .unwrap_or_else(|_| "http://localhost:1234".to_string());
+pub fn lm_studio(host_override: Option<&str>) -> OpenAiCompatProvider {
+    let host = host_override
+        .map(str::to_string)
+        .or_else(|| std::env::var("LM_STUDIO_HOST").ok())
+        .unwrap_or_else(|| "http://localhost:1234".to_string());
     let base_url = format!("{}/v1", host.trim_end_matches('/'));
     OpenAiCompatProvider::new(ProviderId::LM_STUDIO, "LM Studio", base_url).with_quirks(
         ProviderQuirks {
@@ -49,9 +53,11 @@ pub fn lm_studio() -> OpenAiCompatProvider {
 
 /// llama.cpp — lightweight C++ inference server.
 /// Reads `LLAMA_CPP_HOST` for the base URL; defaults to `http://localhost:8080`.
-pub fn llama_cpp() -> OpenAiCompatProvider {
-    let host = std::env::var("LLAMA_CPP_HOST")
-        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+pub fn llama_cpp(host_override: Option<&str>) -> OpenAiCompatProvider {
+    let host = host_override
+        .map(str::to_string)
+        .or_else(|| std::env::var("LLAMA_CPP_HOST").ok())
+        .unwrap_or_else(|| "http://localhost:8080".to_string());
     let base_url = format!("{}/v1", host.trim_end_matches('/'));
     OpenAiCompatProvider::new(ProviderId::LLAMA_CPP, "llama.cpp", base_url).with_quirks(
         ProviderQuirks {
