@@ -6,88 +6,92 @@
 use async_trait::async_trait;
 use claurst_core::config::PermissionMode;
 use claurst_core::cost::CostTracker;
+use claurst_core::error::ClaudeError;
 use claurst_core::permissions::{PermissionDecision, PermissionHandler, PermissionRequest};
 use claurst_core::types::ToolDefinition;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 // Sub-modules – each contains a full tool implementation.
+pub mod apply_patch;
 pub mod ask_user;
 pub mod bash;
-pub mod pty_bash;
+pub mod batch_edit;
 pub mod brief;
+pub mod bundled_skills;
+pub mod computer_use;
 pub mod config_tool;
 pub mod cron;
 pub mod enter_plan_mode;
 pub mod exit_plan_mode;
-pub mod apply_patch;
-pub mod batch_edit;
 pub mod file_edit;
 pub mod file_read;
 pub mod file_write;
+pub mod formatter;
 pub mod glob_tool;
 pub mod grep_tool;
 pub mod lsp_tool;
+pub mod mcp_auth_tool;
 pub mod mcp_resources;
-pub mod todo_write;
 pub mod notebook_edit;
 pub mod powershell;
+pub mod pty_bash;
+pub mod remote_trigger;
+pub mod repl_tool;
 pub mod send_message;
-pub mod bundled_skills;
 pub mod skill_tool;
 pub mod sleep;
+pub mod synthetic_output;
 pub mod tasks;
+pub mod team_tool;
+pub mod todo_write;
 pub mod tool_search;
 pub mod web_fetch;
 pub mod web_search;
 pub mod worktree;
-pub mod computer_use;
-pub mod mcp_auth_tool;
-pub mod repl_tool;
-pub mod synthetic_output;
-pub mod team_tool;
-pub mod remote_trigger;
-pub mod formatter;
 
 // Re-exports for convenience.
-pub use formatter::try_format_file;
+pub use apply_patch::ApplyPatchTool;
 pub use ask_user::AskUserQuestionTool;
 pub use bash::BashTool;
-pub use pty_bash::PtyBashTool;
+pub use batch_edit::BatchEditTool;
 pub use brief::BriefTool;
+pub use computer_use::ComputerUseTool;
 pub use config_tool::ConfigTool;
 pub use cron::{CronCreateTool, CronDeleteTool, CronListTool};
 pub use enter_plan_mode::EnterPlanModeTool;
 pub use exit_plan_mode::ExitPlanModeTool;
-pub use apply_patch::ApplyPatchTool;
-pub use batch_edit::BatchEditTool;
 pub use file_edit::FileEditTool;
 pub use file_read::FileReadTool;
 pub use file_write::FileWriteTool;
+pub use formatter::try_format_file;
 pub use glob_tool::GlobTool;
 pub use grep_tool::GrepTool;
 pub use lsp_tool::LspTool;
+pub use mcp_auth_tool::McpAuthTool;
 pub use mcp_resources::{ListMcpResourcesTool, ReadMcpResourceTool};
-pub use todo_write::TodoWriteTool;
 pub use notebook_edit::NotebookEditTool;
 pub use powershell::PowerShellTool;
-pub use send_message::{SendMessageTool, drain_inbox, peek_inbox};
+pub use pty_bash::PtyBashTool;
+pub use remote_trigger::RemoteTriggerTool;
+pub use repl_tool::ReplTool;
+pub use send_message::{drain_inbox, peek_inbox, SendMessageTool};
 pub use skill_tool::SkillTool;
 pub use sleep::SleepTool;
-pub use tasks::{TaskCreateTool, TaskGetTool, TaskListTool, TaskOutputTool, TaskStopTool, TaskUpdateTool, Task, TaskStatus, TASK_STORE};
+pub use synthetic_output::SyntheticOutputTool;
+pub use tasks::{
+    Task, TaskCreateTool, TaskGetTool, TaskListTool, TaskOutputTool, TaskStatus, TaskStopTool,
+    TaskUpdateTool, TASK_STORE,
+};
+pub use team_tool::{register_agent_runner, AgentRunFn, TeamCreateTool, TeamDeleteTool};
+pub use todo_write::TodoWriteTool;
 pub use tool_search::ToolSearchTool;
 pub use web_fetch::WebFetchTool;
 pub use web_search::WebSearchTool;
 pub use worktree::{EnterWorktreeTool, ExitWorktreeTool};
-pub use computer_use::ComputerUseTool;
-pub use mcp_auth_tool::McpAuthTool;
-pub use repl_tool::ReplTool;
-pub use synthetic_output::SyntheticOutputTool;
-pub use team_tool::{TeamCreateTool, TeamDeleteTool, register_agent_runner, AgentRunFn};
-pub use remote_trigger::RemoteTriggerTool;
 
 // ---------------------------------------------------------------------------
 // Core trait & types
@@ -170,13 +174,15 @@ impl ShellState {
 /// Process-global registry of shell states keyed by session_id.
 /// This lets us persist cwd/env across Bash invocations without changing
 /// the `ToolContext` struct (which is constructed in places we cannot modify).
-static SHELL_STATE_REGISTRY: once_cell::sync::Lazy<dashmap::DashMap<String, Arc<parking_lot::Mutex<ShellState>>>> =
-    once_cell::sync::Lazy::new(dashmap::DashMap::new);
+static SHELL_STATE_REGISTRY: once_cell::sync::Lazy<
+    dashmap::DashMap<String, Arc<parking_lot::Mutex<ShellState>>>,
+> = once_cell::sync::Lazy::new(dashmap::DashMap::new);
 
 /// Process-global registry of `SnapshotManager` instances keyed by session_id.
 /// Used by tools to record pre-write snapshots and by `/undo` to revert them.
-static SNAPSHOT_REGISTRY: once_cell::sync::Lazy<dashmap::DashMap<String, Arc<parking_lot::Mutex<claurst_core::SnapshotManager>>>> =
-    once_cell::sync::Lazy::new(dashmap::DashMap::new);
+static SNAPSHOT_REGISTRY: once_cell::sync::Lazy<
+    dashmap::DashMap<String, Arc<parking_lot::Mutex<claurst_core::SnapshotManager>>>,
+> = once_cell::sync::Lazy::new(dashmap::DashMap::new);
 
 /// Return the persistent `ShellState` for the given session, creating one if needed.
 pub fn session_shell_state(session_id: &str) -> Arc<parking_lot::Mutex<ShellState>> {
@@ -192,7 +198,9 @@ pub fn clear_session_shell_state(session_id: &str) {
 }
 
 /// Return the persistent `SnapshotManager` for the given session, creating one if needed.
-pub fn session_snapshot(session_id: &str) -> Arc<parking_lot::Mutex<claurst_core::SnapshotManager>> {
+pub fn session_snapshot(
+    session_id: &str,
+) -> Arc<parking_lot::Mutex<claurst_core::SnapshotManager>> {
     SNAPSHOT_REGISTRY
         .entry(session_id.to_string())
         .or_insert_with(|| Arc::new(parking_lot::Mutex::new(claurst_core::SnapshotManager::new())))
@@ -223,13 +231,17 @@ pub struct ToolContext {
 }
 
 impl ToolContext {
-    /// Resolve a potentially relative path against the working directory.
-    pub fn resolve_path(&self, path: &str) -> PathBuf {
-        let p = PathBuf::from(path);
-        if p.is_absolute() {
-            p
+    /// Resolve a potentially relative path against the working directory and
+    /// enforce that the result stays inside an allowed workspace root.
+    pub fn resolve_path(&self, path: &str) -> Result<PathBuf, ClaudeError> {
+        let candidate = self.resolve_candidate_path(path);
+        if self.path_is_allowed(&candidate) {
+            Ok(candidate)
         } else {
-            self.working_dir.join(p)
+            Err(ClaudeError::PermissionDenied(format!(
+                "Path '{}' is outside the allowed workspace roots.",
+                candidate.display()
+            )))
         }
     }
 
@@ -290,6 +302,55 @@ impl ToolContext {
         self.current_turn.load(Ordering::Relaxed)
     }
 
+    fn resolve_candidate_path(&self, path: &str) -> PathBuf {
+        let p = Path::new(path);
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            self.working_dir.join(p)
+        }
+    }
+
+    fn allowed_roots(&self) -> Vec<PathBuf> {
+        let mut roots = Vec::new();
+        roots.push(self.resolve_config_path(&self.working_dir));
+
+        if let Some(project_dir) = &self.config.project_dir {
+            roots.push(self.resolve_config_path(project_dir));
+        }
+
+        roots.extend(
+            self.config
+                .workspace_paths
+                .iter()
+                .map(|p| self.resolve_config_path(p)),
+        );
+        roots.extend(
+            self.config
+                .additional_dirs
+                .iter()
+                .map(|p| self.resolve_config_path(p)),
+        );
+
+        roots
+    }
+
+    fn resolve_config_path(&self, path: &Path) -> PathBuf {
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.working_dir.join(path)
+        }
+    }
+
+    fn path_is_allowed(&self, path: &Path) -> bool {
+        let candidate = canonicalize_or_normalize(path);
+        self.allowed_roots().into_iter().any(|root| {
+            let root = canonicalize_or_normalize(&root);
+            candidate == root || candidate.starts_with(&root)
+        })
+    }
+
     pub fn record_file_change(
         &self,
         path: PathBuf,
@@ -305,6 +366,49 @@ impl ToolContext {
             tool_name,
         );
     }
+}
+
+fn canonicalize_or_normalize(path: &Path) -> PathBuf {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return canonical;
+    }
+
+    for ancestor in path.ancestors() {
+        if ancestor.exists() {
+            if let Ok(canonical) = std::fs::canonicalize(ancestor) {
+                if let Ok(suffix) = path.strip_prefix(ancestor) {
+                    return normalize_path(&canonical.join(suffix));
+                }
+            }
+        }
+    }
+
+    normalize_path(path)
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                normalized.push(component.as_os_str());
+            }
+            Component::Normal(part) => {
+                normalized.push(part);
+            }
+        }
+    }
+
+    if normalized.as_os_str().is_empty() {
+        normalized.push(".");
+    }
+
+    normalized
 }
 
 /// The trait every tool must implement.
@@ -404,7 +508,10 @@ mod tests {
     #[test]
     fn test_all_tools_non_empty() {
         let tools = all_tools();
-        assert!(!tools.is_empty(), "all_tools() must return at least one tool");
+        assert!(
+            !tools.is_empty(),
+            "all_tools() must return at least one tool"
+        );
     }
 
     #[test]
@@ -470,9 +577,16 @@ mod tests {
     #[test]
     fn test_core_tools_present() {
         let expected = [
-            "Bash", "Read", "Edit", "Write", "Glob", "Grep",
-            "WebFetch", "WebSearch",
-            "TodoWrite", "Skill",
+            "Bash",
+            "Read",
+            "Edit",
+            "Write",
+            "Glob",
+            "Grep",
+            "WebFetch",
+            "WebSearch",
+            "TodoWrite",
+            "Skill",
         ];
         for name in &expected {
             assert!(
@@ -534,9 +648,10 @@ mod tests {
             config: Config::default(),
         };
 
-        // Absolute paths pass through unchanged
-        let resolved = ctx.resolve_path("/absolute/path/file.rs");
-        assert_eq!(resolved, PathBuf::from("/absolute/path/file.rs"));
+        // Absolute paths inside the workspace are allowed.
+        let resolved = ctx.resolve_path("/workspace/src/main.rs");
+        assert!(resolved.is_ok());
+        assert_eq!(resolved.unwrap(), PathBuf::from("/workspace/src/main.rs"));
     }
 
     #[test]
@@ -564,7 +679,35 @@ mod tests {
 
         // Relative paths get joined with working_dir
         let resolved = ctx.resolve_path("src/main.rs");
-        assert_eq!(resolved, PathBuf::from("/workspace/src/main.rs"));
+        assert!(resolved.is_ok());
+        assert_eq!(resolved.unwrap(), PathBuf::from("/workspace/src/main.rs"));
+    }
+
+    #[test]
+    fn test_resolve_path_rejects_escape() {
+        use claurst_core::config::Config;
+        use claurst_core::permissions::AutoPermissionHandler;
+
+        let handler = Arc::new(AutoPermissionHandler {
+            mode: claurst_core::config::PermissionMode::Default,
+        });
+        let ctx = ToolContext {
+            working_dir: PathBuf::from("/workspace"),
+            permission_mode: claurst_core::config::PermissionMode::Default,
+            permission_handler: handler,
+            cost_tracker: claurst_core::cost::CostTracker::new(),
+            session_id: "test".to_string(),
+            file_history: Arc::new(parking_lot::Mutex::new(
+                claurst_core::file_history::FileHistory::new(),
+            )),
+            current_turn: Arc::new(AtomicUsize::new(0)),
+            non_interactive: true,
+            mcp_manager: None,
+            config: Config::default(),
+        };
+
+        let resolved = ctx.resolve_path("../etc/passwd");
+        assert!(resolved.is_err());
     }
 
     // ---- PermissionLevel tests ---------------------------------------------

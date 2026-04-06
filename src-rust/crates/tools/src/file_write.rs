@@ -53,15 +53,16 @@ impl Tool for FileWriteTool {
             Err(e) => return ToolResult::error(format!("Invalid input: {}", e)),
         };
 
-        let path = ctx.resolve_path(&params.file_path);
+        let path = match ctx.resolve_path(&params.file_path) {
+            Ok(path) => path,
+            Err(e) => return ToolResult::error(e.to_string()),
+        };
         debug!(path = %path.display(), "Writing file");
 
         // Permission check
-        if let Err(e) = ctx.check_permission(
-            self.name(),
-            &format!("Write {}", path.display()),
-            false,
-        ) {
+        if let Err(e) =
+            ctx.check_permission(self.name(), &format!("Write {}", path.display()), false)
+        {
             return ToolResult::error(e.to_string());
         }
 
@@ -97,11 +98,7 @@ impl Tool for FileWriteTool {
 
         // Write the file
         if let Err(e) = tokio::fs::write(&path, &params.content).await {
-            return ToolResult::error(format!(
-                "Failed to write file {}: {}",
-                path.display(),
-                e
-            ));
+            return ToolResult::error(format!("Failed to write file {}: {}", path.display(), e));
         }
 
         ctx.record_file_change(

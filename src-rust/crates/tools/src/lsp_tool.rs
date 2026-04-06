@@ -64,24 +64,14 @@ impl Tool for LspTool {
         };
 
         // Resolve to absolute path
-        let file_path = if std::path::Path::new(&file_raw).is_absolute() {
-            file_raw.clone()
-        } else {
-            ctx.working_dir
-                .join(&file_raw)
-                .to_string_lossy()
-                .into_owned()
+        let file_path = match ctx.resolve_path(&file_raw) {
+            Ok(path) => path.to_string_lossy().into_owned(),
+            Err(e) => return ToolResult::error(e.to_string()),
         };
 
         // line/column only required for position-based actions
-        let line = input
-            .get("line")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1) as u32;
-        let column = input
-            .get("column")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1) as u32;
+        let line = input.get("line").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+        let column = input.get("column").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
 
         // --- Seed the global LSP manager with configs from current session ---
         let lsp_manager_arc = claurst_core::lsp::global_lsp_manager();

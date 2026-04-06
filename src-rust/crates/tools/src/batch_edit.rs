@@ -90,15 +90,10 @@ impl Tool for BatchEditTool {
         }
 
         // Permission check (one check covers the whole batch).
-        let description = params
-            .description
-            .as_deref()
-            .unwrap_or("batch file edits");
-        if let Err(e) = ctx.check_permission(
-            self.name(),
-            &format!("BatchEdit: {}", description),
-            false,
-        ) {
+        let description = params.description.as_deref().unwrap_or("batch file edits");
+        if let Err(e) =
+            ctx.check_permission(self.name(), &format!("BatchEdit: {}", description), false)
+        {
             return ToolResult::error(e.to_string());
         }
 
@@ -111,7 +106,16 @@ impl Tool for BatchEditTool {
         let mut pre_check_errors: Vec<String> = Vec::new();
 
         for (i, edit) in params.edits.iter().enumerate() {
-            let path = ctx.resolve_path(&edit.file_path);
+            let path = match ctx.resolve_path(&edit.file_path) {
+                Ok(path) => path,
+                Err(e) => {
+                    pre_check_errors.push(format!(
+                        "Edit {}: cannot resolve {}: {}",
+                        i, edit.file_path, e
+                    ));
+                    continue;
+                }
+            };
             debug!(path = %path.display(), index = i, "BatchEdit pre-check");
 
             let content = match tokio::fs::read_to_string(&path).await {
