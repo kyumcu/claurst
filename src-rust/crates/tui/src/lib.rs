@@ -86,8 +86,6 @@ pub mod overage_upsell;
 pub mod voice_mode_notice;
 /// Message copy utilities for different formatting options (markdown, plaintext, code, JSON).
 pub mod message_copy;
-/// Desktop app upsell startup dialog (shown at startup on macOS/Windows x64).
-pub mod desktop_upsell_startup;
 /// Memory update notification banner (shown after Claurst updates a AGENTS.md file).
 pub mod memory_update_notification;
 /// MCP elicitation dialog (form-based user input requested by MCP servers).
@@ -127,7 +125,6 @@ pub use memory_file_selector::{MemoryFileSelectorState, MemoryFile, MemoryFileTy
 pub use hooks_config_menu::{HooksConfigMenuState, HookEntry};
 pub use overage_upsell::{OverageCreditUpsellState, render_overage_upsell};
 pub use voice_mode_notice::{VoiceModeNoticeState, render_voice_mode_notice};
-pub use desktop_upsell_startup::{DesktopUpsellStartupState, DesktopUpsellSelection, render_desktop_upsell_startup};
 pub use memory_update_notification::{MemoryUpdateNotificationState, render_memory_update_notification, get_relative_memory_path};
 pub use elicitation_dialog::{ElicitationDialogState, ElicitationField, ElicitationFieldKind, ElicitationResult, render_elicitation_dialog};
 pub use diff_viewer::{DiffViewerState, DiffPane, DiffType, load_git_diff, parse_unified_diff, render_diff_dialog};

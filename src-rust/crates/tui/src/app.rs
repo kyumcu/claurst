@@ -615,8 +615,6 @@ pub struct App {
     pub overage_upsell: crate::overage_upsell::OverageCreditUpsellState,
     /// Voice mode availability notice.
     pub voice_mode_notice: crate::voice_mode_notice::VoiceModeNoticeState,
-    /// Desktop app upsell startup dialog.
-    pub desktop_upsell: crate::desktop_upsell_startup::DesktopUpsellStartupState,
     /// Startup error dialog for malformed settings.json or AGENTS.md.
     pub invalid_config_dialog: crate::invalid_config_dialog::InvalidConfigDialogState,
     /// Memory update notification banner.
@@ -1038,7 +1036,6 @@ impl App {
             hooks_config_menu: crate::hooks_config_menu::HooksConfigMenuState::new(),
             overage_upsell: crate::overage_upsell::OverageCreditUpsellState::new(),
             voice_mode_notice: crate::voice_mode_notice::VoiceModeNoticeState::new(),
-            desktop_upsell: crate::desktop_upsell_startup::DesktopUpsellStartupState::new(),
             invalid_config_dialog: crate::invalid_config_dialog::InvalidConfigDialogState::new(),
             memory_update_notification: crate::memory_update_notification::MemoryUpdateNotificationState::new(),
             elicitation: crate::elicitation_dialog::ElicitationDialogState::new(),
@@ -2944,29 +2941,6 @@ impl App {
         if key.code == KeyCode::Esc && self.voice_mode_notice.visible {
             self.voice_mode_notice.dismiss();
             return false;
-        }
-
-        // Desktop upsell startup dialog
-        if self.desktop_upsell.visible {
-            match key.code {
-                KeyCode::Up | KeyCode::BackTab => {
-                    self.desktop_upsell.select_prev();
-                    return false;
-                }
-                KeyCode::Down | KeyCode::Tab => {
-                    self.desktop_upsell.select_next();
-                    return false;
-                }
-                KeyCode::Enter => {
-                    self.desktop_upsell.confirm();
-                    return false;
-                }
-                KeyCode::Esc => {
-                    self.desktop_upsell.dismiss_temporarily();
-                    return false;
-                }
-                _ => return false,
-            }
         }
 
         // Memory update notification dismiss

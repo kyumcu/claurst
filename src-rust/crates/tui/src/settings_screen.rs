@@ -772,7 +772,7 @@ fn build_privacy_lines(screen: &SettingsScreen) -> Vec<Line<'static>> {
     )]));
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
-        "  For full privacy policy see: https://www.anthropic.com/privacy",
+        "  Review the privacy terms for each provider and service you enable.",
         Style::default().fg(Color::DarkGray),
     )]));
 

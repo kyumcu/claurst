@@ -16,7 +16,6 @@ use crate::dialogs::{render_mcp_approval_dialog, render_permission_dialog};
 use crate::feedback_survey::render_feedback_survey;
 use crate::overage_upsell::render_overage_upsell;
 use crate::voice_mode_notice::render_voice_mode_notice;
-use crate::desktop_upsell_startup::render_desktop_upsell_startup;
 use crate::memory_update_notification::render_memory_update_notification;
 use crate::invalid_config_dialog::render_invalid_config_dialog;
 use crate::bypass_permissions_dialog::render_bypass_permissions_dialog;
@@ -106,7 +105,6 @@ fn is_modal_open(app: &App) -> bool {
         || app.overage_upsell.visible
         || app.voice_mode_notice.visible
         || app.memory_update_notification.visible
-        || app.desktop_upsell.visible
         || app.invalid_config_dialog.visible
         || app.bypass_permissions_dialog.visible
         || app.onboarding_dialog.visible
@@ -499,11 +497,6 @@ pub fn render_app(frame: &mut Frame, app: &App) {
                 frame.buffer_mut(),
             );
         }
-    }
-
-    // Desktop upsell startup modal
-    if app.desktop_upsell.visible {
-        render_desktop_upsell_startup(&app.desktop_upsell, size, frame.buffer_mut());
     }
 
     // Invalid config/settings dialog (shown when settings.json or AGENTS.md is malformed)

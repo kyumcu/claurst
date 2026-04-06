@@ -30,7 +30,7 @@ pub struct OverageCreditUpsellState {
 impl OverageCreditUpsellState {
     pub fn new() -> Self {
         Self {
-            credits_url: "https://claude.ai/settings/billing".to_string(),
+            credits_url: "/upgrade".to_string(),
             ..Default::default()
         }
     }
@@ -95,7 +95,7 @@ pub fn render_overage_upsell(state: &OverageCreditUpsellState, area: Rect, buf: 
     let lines = vec![
         Line::from(vec![
             Span::styled(
-                "  You've exceeded your usage limit. Add credits to continue: ",
+                "  You've exceeded your usage limit. Review billing or higher-limit options: ",
                 Style::default().fg(Color::White),
             ),
             Span::styled(
@@ -155,7 +155,7 @@ mod tests {
         render_overage_upsell(&state, area, &mut buf);
         let rendered = buf.content.iter().map(|c| c.symbol()).collect::<Vec<_>>().join("");
         assert!(rendered.contains("Overage Alert"));
-        assert!(rendered.contains("credits"));
+        assert!(rendered.contains("higher-limit options"));
     }
 
     #[test]

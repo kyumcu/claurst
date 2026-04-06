@@ -5320,8 +5320,7 @@ impl SlashCommand for RateLimitOptionsCommand {
              │ Max (20x)     │ 20× Pro limits (highest tier)   │\n\
              │ API / Console │ Usage-billed, no hard cap       │\n\
              └─────────────────────────────────────────────────┘\n\n\
-             To upgrade: /upgrade\n\
-             Manage billing: https://claude.ai/settings/billing",
+             To upgrade or manage billing, use /upgrade.",
             tier_info = tier_info,
         ))
     }

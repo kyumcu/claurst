@@ -1085,7 +1085,7 @@ pub fn render_rate_limit_with_hint(retry_after_secs: u64, show_upgrade_hint: boo
     ];
     if show_upgrade_hint {
         lines.push(Line::from(vec![Span::styled(
-            "  \u{2192} claude.ai/upgrade for higher limits",
+            "  \u{2192} Use /upgrade to review higher-limit options",
             Style::default().fg(Color::DarkGray),
         )]));
     }
@@ -2035,7 +2035,7 @@ mod tests {
         let result = render_rate_limit_with_hint(60, true);
         assert_eq!(result.len(), 3, "with hint should have 3 lines");
         let last = line_text(result.last().unwrap());
-        assert!(last.contains("claude.ai/upgrade"));
+        assert!(last.contains("/upgrade"));
     }
 
     #[test]
