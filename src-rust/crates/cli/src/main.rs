@@ -518,22 +518,10 @@ async fn main() -> anyhow::Result<()> {
             std::env::var("OPENAI_API_KEY").is_ok()
             || std::env::var("GOOGLE_API_KEY").is_ok()
             || std::env::var("GOOGLE_GENERATIVE_AI_API_KEY").is_ok()
-            || std::env::var("GROQ_API_KEY").is_ok()
-            || std::env::var("XAI_API_KEY").is_ok()
-            || std::env::var("MISTRAL_API_KEY").is_ok()
-            || std::env::var("OPENROUTER_API_KEY").is_ok()
-            || std::env::var("DEEPSEEK_API_KEY").is_ok()
-            || std::env::var("COHERE_API_KEY").is_ok()
-            || std::env::var("TOGETHER_API_KEY").is_ok()
-            || std::env::var("PERPLEXITY_API_KEY").is_ok()
-            || std::env::var("CEREBRAS_API_KEY").is_ok()
-            || std::env::var("DEEPINFRA_API_KEY").is_ok()
-            || std::env::var("VENICE_API_KEY").is_ok()
-            || std::env::var("DASHSCOPE_API_KEY").is_ok()
-            || std::env::var("AZURE_API_KEY").is_ok()
             || std::env::var("GITHUB_TOKEN").is_ok()
-            || std::env::var("AWS_BEARER_TOKEN_BEDROCK").is_ok()
-            || std::env::var("AWS_ACCESS_KEY_ID").is_ok();
+            || std::env::var("OLLAMA_HOST").is_ok()
+            || std::env::var("LM_STUDIO_HOST").is_ok()
+            || std::env::var("LLAMA_CPP_HOST").is_ok();
         active_provider != ProviderId::ANTHROPIC || has_non_anthropic_env
     };
 
@@ -559,10 +547,10 @@ async fn main() -> anyhow::Result<()> {
                     "No API key found. Options:\n\
                      - Run `claurst --provider llama-cpp` for llama.cpp (local, no key needed)\n\
                      - Run `claurst --provider ollama` for Ollama (local, no key needed)\n\
+                     - Run `claurst --provider lm-studio` for LM Studio (local, no key needed)\n\
                      - Set ANTHROPIC_API_KEY for Anthropic\n\
                      - Set OPENAI_API_KEY for OpenAI\n\
                      - Set GOOGLE_API_KEY for Google Gemini\n\
-                     - Set GROQ_API_KEY for Groq (fast, free tier available)\n\
                      - Run `claurst auth login` for Anthropic OAuth"
                 );
             } else {

@@ -228,18 +228,13 @@ impl ModelRegistry {
             Some(ProviderId::ANTHROPIC)
         } else if model_name.starts_with("gpt-") || model_name.starts_with("o1") || model_name.starts_with("o3") || model_name.starts_with("o4") {
             Some(ProviderId::OPENAI)
-        } else if model_name.starts_with("gemini") || model_name.starts_with("gemma") {
+        } else if model_name.starts_with("gemini") {
             Some(ProviderId::GOOGLE)
-        } else if model_name.starts_with("deepseek") {
-            Some("deepseek")
-        } else if model_name.starts_with("mistral") || model_name.starts_with("codestral") || model_name.starts_with("pixtral") {
-            Some("mistral")
-        } else if model_name.starts_with("grok") {
-            Some("xai")
-        } else if model_name.starts_with("command-r") || model_name.starts_with("command-a") {
-            Some("cohere")
-        } else if model_name.starts_with("sonar") {
-            Some("perplexity")
+        } else if model_name.starts_with("llama")
+            || model_name.starts_with("gemma")
+            || model_name.starts_with("qwen")
+        {
+            Some(ProviderId::LLAMA_CPP)
         } else {
             None
         };
@@ -301,12 +296,9 @@ impl ModelRegistry {
             "gpt-4o",
             "gemini-2.5-pro",
             "gemini-2.5-flash",
-            "deepseek-chat",
-            "mistral-large",
-            "grok-2",
-            "command-r-plus",
             "llama-3.3-70b",
-            "sonar-pro",
+            "qwen2.5",
+            "gemma-3",
         ];
 
         // Score each model: lower is better.
@@ -356,12 +348,9 @@ impl ModelRegistry {
             "gpt-4o-mini",
             "gemini-2.5-flash",
             "gemini-2.0-flash",
-            "deepseek-chat",
-            "mistral-small",
-            "grok-2-mini",
-            "command-r",
             "llama-3.3-8b",
-            "sonar",
+            "qwen2.5",
+            "gemma-3",
         ];
 
         models.sort_by(|a, b| {

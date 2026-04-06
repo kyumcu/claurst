@@ -1,29 +1,5 @@
 use serde_json::{Map, Value};
 
-fn merge_maps(target: &mut Map<String, Value>, source: &Map<String, Value>) {
-    for (key, value) in source {
-        match (target.get_mut(key), value) {
-            (Some(Value::Object(target_obj)), Value::Object(source_obj)) => {
-                merge_maps(target_obj, source_obj);
-            }
-            _ => {
-                target.insert(key.clone(), value.clone());
-            }
-        }
-    }
-}
-
-pub(crate) fn merge_root_options(body: &mut Value, provider_options: &Value) {
-    let Some(body_obj) = body.as_object_mut() else {
-        return;
-    };
-    let Some(options_obj) = provider_options.as_object() else {
-        return;
-    };
-
-    merge_maps(body_obj, options_obj);
-}
-
 pub(crate) fn merge_openai_compatible_options(body: &mut Value, provider_options: &Value) {
     let Some(options_obj) = provider_options.as_object() else {
         return;
@@ -87,33 +63,6 @@ pub(crate) fn merge_google_options(body: &mut Value, provider_options: &Value) {
     }
 }
 
-pub(crate) fn merge_bedrock_options(body: &mut Value, provider_options: &Value) {
-    let Some(body_obj) = body.as_object_mut() else {
-        return;
-    };
-    let Some(options_obj) = provider_options.as_object() else {
-        return;
-    };
-
-    for (key, value) in options_obj {
-        match key.as_str() {
-            "inferenceConfig" | "toolConfig" | "reasoningConfig" | "additionalModelRequestFields" => {
-                match (body_obj.get_mut(key), value) {
-                    (Some(Value::Object(target_obj)), Value::Object(source_obj)) => {
-                        merge_maps(target_obj, source_obj);
-                    }
-                    _ => {
-                        body_obj.insert(key.clone(), value.clone());
-                    }
-                }
-            }
-            _ => {
-                body_obj.insert(key.clone(), value.clone());
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,28 +107,4 @@ mod tests {
         assert_eq!(body["cachedContent"], json!("abc"));
     }
 
-    #[test]
-    fn merge_bedrock_merges_nested_configs() {
-        let mut body = json!({
-            "toolConfig": {
-                "tools": [{"toolSpec": {"name": "a"}}]
-            }
-        });
-        merge_bedrock_options(
-            &mut body,
-            &json!({
-                "toolConfig": {
-                    "toolChoice": {"auto": {}}
-                },
-                "reasoningConfig": {
-                    "type": "enabled",
-                    "budgetTokens": 1000
-                }
-            }),
-        );
-
-        assert!(body["toolConfig"]["tools"].is_array());
-        assert_eq!(body["toolConfig"]["toolChoice"]["auto"], json!({}));
-        assert_eq!(body["reasoningConfig"]["budgetTokens"], json!(1000));
-    }
 }

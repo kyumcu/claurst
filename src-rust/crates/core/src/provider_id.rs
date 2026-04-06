@@ -34,8 +34,6 @@ impl ProviderId {
         match provider_id {
             "llamacpp" | "llama.cpp" => Self::LLAMA_CPP,
             "lmstudio" => Self::LM_STUDIO,
-            "togetherai" => Self::TOGETHER_AI,
-            "vultr-ai" => "vultr",
             other => other,
         }
     }
@@ -58,43 +56,9 @@ impl ProviderId {
     pub const ANTHROPIC: &'static str = "anthropic";
     pub const OPENAI: &'static str = "openai";
     pub const GOOGLE: &'static str = "google";
-    pub const GOOGLE_VERTEX: &'static str = "google-vertex";
-    pub const AMAZON_BEDROCK: &'static str = "amazon-bedrock";
-    pub const AZURE: &'static str = "azure";
-    pub const GITHUB_COPILOT: &'static str = "github-copilot";
-    pub const MISTRAL: &'static str = "mistral";
-    pub const XAI: &'static str = "xai";
-    pub const GROQ: &'static str = "groq";
-    pub const DEEPINFRA: &'static str = "deepinfra";
-    pub const CEREBRAS: &'static str = "cerebras";
-    pub const COHERE: &'static str = "cohere";
-    pub const TOGETHER_AI: &'static str = "together-ai";
-    pub const PERPLEXITY: &'static str = "perplexity";
-    pub const OPENROUTER: &'static str = "openrouter";
     pub const OLLAMA: &'static str = "ollama";
     pub const LM_STUDIO: &'static str = "lm-studio";
     pub const LLAMA_CPP: &'static str = "llama-cpp";
-    pub const DEEPSEEK: &'static str = "deepseek";
-    pub const GITLAB: &'static str = "gitlab";
-    pub const CLOUDFLARE: &'static str = "cloudflare";
-    pub const VENICE: &'static str = "venice";
-    pub const SAP: &'static str = "sap";
-    pub const SAMBANOVA: &'static str = "sambanova";
-    pub const HUGGINGFACE: &'static str = "huggingface";
-    pub const NVIDIA: &'static str = "nvidia";
-    pub const SILICONFLOW: &'static str = "siliconflow";
-    pub const MOONSHOT: &'static str = "moonshotai";
-    pub const ZHIPU: &'static str = "zhipuai";
-    pub const NEBIUS: &'static str = "nebius";
-    pub const OVHCLOUD: &'static str = "ovhcloud";
-    pub const SCALEWAY: &'static str = "scaleway";
-    pub const VULTR: &'static str = "vultr";
-    pub const BASETEN: &'static str = "baseten";
-    pub const FRIENDLI: &'static str = "friendli";
-    pub const UPSTAGE: &'static str = "upstage";
-    pub const STEPFUN: &'static str = "stepfun";
-    pub const FIREWORKS: &'static str = "fireworks";
-    pub const NOVITA: &'static str = "novita";
 }
 
 impl fmt::Display for ProviderId {
@@ -200,7 +164,6 @@ mod tests {
         assert_eq!(ProviderId::canonical_str("llamacpp"), ProviderId::LLAMA_CPP);
         assert_eq!(ProviderId::canonical_str("llama.cpp"), ProviderId::LLAMA_CPP);
         assert_eq!(ProviderId::canonical_str("lmstudio"), ProviderId::LM_STUDIO);
-        assert_eq!(ProviderId::canonical_str("togetherai"), ProviderId::TOGETHER_AI);
     }
 
     #[test]
