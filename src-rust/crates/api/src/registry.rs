@@ -16,6 +16,10 @@ use crate::providers::{
     GoogleProvider, OpenAiProvider,
 };
 
+fn canonical_provider_id(provider_id: &str) -> &str {
+    ProviderId::canonical_str(provider_id)
+}
+
 /// Registry of all available LLM providers.
 /// Holds `Arc<dyn LlmProvider>` for each registered provider.
 pub struct ProviderRegistry {
@@ -26,7 +30,7 @@ pub struct ProviderRegistry {
 fn provider_from_key(provider_id: &str, key: String) -> Option<Arc<dyn LlmProvider>> {
     use crate::providers::openai_compat_providers as p;
 
-    match provider_id {
+    match canonical_provider_id(provider_id) {
         "anthropic" => Some(Arc::new(AnthropicProvider::from_config(
             ClientConfig { api_key: key, ..Default::default() },
         ))),
@@ -67,6 +71,7 @@ fn provider_from_key(provider_id: &str, key: String) -> Option<Arc<dyn LlmProvid
 
 pub fn runtime_provider_for(provider_id: &str) -> Option<Arc<dyn LlmProvider>> {
     let auth_store = claurst_core::AuthStore::load();
+    let provider_id = canonical_provider_id(provider_id);
     let key = auth_store.api_key_for(provider_id)?;
     if key.is_empty() {
         return None;
@@ -75,11 +80,11 @@ pub fn runtime_provider_for(provider_id: &str) -> Option<Arc<dyn LlmProvider>> {
 }
 
 impl ProviderRegistry {
-    /// Create an empty registry with Anthropic as the default provider ID.
+    /// Create an empty registry with llama.cpp as the default provider ID.
     pub fn new() -> Self {
         Self {
             providers: HashMap::new(),
-            default_provider_id: ProviderId::new(ProviderId::ANTHROPIC),
+            default_provider_id: ProviderId::new(ProviderId::LLAMA_CPP),
         }
     }
 
@@ -95,6 +100,7 @@ impl ProviderRegistry {
     /// # Panics
     /// Panics if no provider with that ID has been registered.
     pub fn set_default(&mut self, id: ProviderId) -> &mut Self {
+        let id = ProviderId::new(canonical_provider_id(&id));
         assert!(
             self.providers.contains_key(&id),
             "set_default: provider '{}' is not registered",
@@ -106,7 +112,8 @@ impl ProviderRegistry {
 
     /// Get a provider by ID.
     pub fn get(&self, id: &ProviderId) -> Option<&Arc<dyn LlmProvider>> {
-        self.providers.get(id)
+        let canonical = ProviderId::new(canonical_provider_id(id));
+        self.providers.get(&canonical).or_else(|| self.providers.get(id))
     }
 
     /// Get the default provider.
@@ -140,8 +147,8 @@ impl ProviderRegistry {
         results
     }
 
-    /// Convenience: build a registry with just Anthropic registered as the
-    /// default provider.  Takes the same [`ClientConfig`] that
+    /// Convenience: build a registry with just Anthropic registered and set
+    /// it as the default provider.  Takes the same [`ClientConfig`] that
     /// [`AnthropicClient`] takes.
     ///
     /// [`AnthropicClient`]: crate::client::AnthropicClient
@@ -149,6 +156,7 @@ impl ProviderRegistry {
         let mut registry = Self::new();
         let provider = Arc::new(AnthropicProvider::from_config(config));
         registry.register(provider);
+        registry.set_default(ProviderId::new(ProviderId::ANTHROPIC));
         registry
     }
 
@@ -213,7 +221,8 @@ impl ProviderRegistry {
     }
 
     /// Build a registry with **all** providers that have credentials configured
-    /// in the environment.  Anthropic is always the default provider.
+    /// in the environment.  llama.cpp is the default provider, with Anthropic
+    /// registered as a best-effort fallback.
     ///
     /// This is the recommended constructor for production use.
     pub fn from_environment(anthropic_config: ClientConfig) -> Self {
@@ -226,6 +235,7 @@ impl ProviderRegistry {
             .with_copilot_if_configured()
             .with_cohere_if_key_set()
             .with_available_providers();
+        registry.set_default(ProviderId::new(ProviderId::LLAMA_CPP));
         registry
     }
 
@@ -247,7 +257,7 @@ impl ProviderRegistry {
         let auth_store = claurst_core::AuthStore::load();
 
         for (provider_id, _cred) in &auth_store.credentials {
-            let pid = claurst_core::ProviderId::new(provider_id.as_str());
+            let pid = claurst_core::ProviderId::new(canonical_provider_id(provider_id));
             // Skip if already registered from env vars.
             if registry.get(&pid).is_some() {
                 continue;
@@ -257,13 +267,14 @@ impl ProviderRegistry {
                 if key.is_empty() {
                     continue;
                 }
-                let provider = provider_from_key(provider_id, key);
+                let provider = provider_from_key(&pid, key);
                 if let Some(p) = provider {
                     registry.register(p);
                 }
             }
         }
 
+        registry.set_default(ProviderId::new(ProviderId::LLAMA_CPP));
         registry
     }
 
@@ -374,5 +385,22 @@ impl ProviderRegistry {
 impl Default for ProviderRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_registry_defaults_to_llama_cpp() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(registry.default_provider_id(), &ProviderId::new(ProviderId::LLAMA_CPP));
+    }
+
+    #[test]
+    fn anthropic_helper_keeps_anthropic_as_the_explicit_default() {
+        let registry = ProviderRegistry::with_anthropic(ClientConfig::default());
+        assert_eq!(registry.default_provider_id(), &ProviderId::new(ProviderId::ANTHROPIC));
     }
 }

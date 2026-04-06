@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::provider_id::ProviderId;
+
 /// A stored credential for a provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -62,26 +64,36 @@ impl AuthStore {
 
     /// Store a credential for the given provider (persists immediately).
     pub fn set(&mut self, provider_id: &str, cred: StoredCredential) {
-        self.credentials.insert(provider_id.to_string(), cred);
+        self.credentials
+            .insert(ProviderId::canonicalize(provider_id), cred);
         self.save();
     }
 
     /// Get the stored credential for a provider.
     pub fn get(&self, provider_id: &str) -> Option<&StoredCredential> {
-        self.credentials.get(provider_id)
+        let canonical = ProviderId::canonical_str(provider_id);
+        self.credentials
+            .get(canonical)
+            .or_else(|| self.credentials.get(provider_id))
     }
 
     /// Remove the credential for a provider (persists immediately).
     pub fn remove(&mut self, provider_id: &str) {
-        self.credentials.remove(provider_id);
+        let canonical = ProviderId::canonical_str(provider_id);
+        self.credentials.remove(canonical);
+        if canonical != provider_id {
+            self.credentials.remove(provider_id);
+        }
         self.save();
     }
 
     /// Get the API key for a provider, checking stored credentials first then
     /// falling back to the relevant environment variable.
     pub fn api_key_for(&self, provider_id: &str) -> Option<String> {
+        let canonical = ProviderId::canonical_str(provider_id);
+
         // Check stored credentials first
-        if let Some(stored) = self.get(provider_id) {
+        if let Some(stored) = self.get(canonical) {
             match stored {
                 StoredCredential::ApiKey { key } => {
                     if !key.is_empty() {
@@ -91,8 +103,8 @@ impl AuthStore {
                 StoredCredential::OAuthToken {
                     access,
                     refresh,
-                    ..
-                } if provider_id == "github-copilot" => {
+                    .. 
+                } if canonical == "github-copilot" => {
                     if !refresh.is_empty() {
                         return Some(refresh.clone());
                     }
@@ -104,7 +116,7 @@ impl AuthStore {
             }
         }
         // Fall back to environment variable
-        let env_var = match provider_id {
+        let env_var = match canonical {
             "anthropic" => "ANTHROPIC_API_KEY",
             "openai" => "OPENAI_API_KEY",
             "google" => "GOOGLE_API_KEY",
@@ -114,7 +126,7 @@ impl AuthStore {
             "mistral" => "MISTRAL_API_KEY",
             "xai" => "XAI_API_KEY",
             "openrouter" => "OPENROUTER_API_KEY",
-            "togetherai" | "together-ai" => "TOGETHER_API_KEY",
+            "together-ai" => "TOGETHER_API_KEY",
             "perplexity" => "PERPLEXITY_API_KEY",
             "cohere" => "COHERE_API_KEY",
             "deepinfra" => "DEEPINFRA_API_KEY",
@@ -162,5 +174,22 @@ mod tests {
         );
 
         assert_eq!(store.api_key_for("openrouter").as_deref(), Some("or-key"));
+    }
+
+    #[test]
+    fn alias_provider_ids_are_canonicalized_on_write_and_lookup() {
+        let mut store = AuthStore::default();
+        store.set(
+            "llamacpp",
+            StoredCredential::ApiKey {
+                key: "local-key".to_string(),
+            },
+        );
+
+        assert!(store.get("llamacpp").is_some());
+        assert!(store.get("llama-cpp").is_some());
+        assert_eq!(store.api_key_for("llama.cpp").as_deref(), Some("local-key"));
+        assert!(store.credentials.contains_key("llama-cpp"));
+        assert!(!store.credentials.contains_key("llamacpp"));
     }
 }
