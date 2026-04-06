@@ -56,7 +56,7 @@ These issues create the highest operational risk:
 
 ### Goal
 
-Create one canonical provider system in the foundational layers.
+Create one canonical provider system in the foundational layers and remove Anthropic-first assumptions from the shared foundation.
 
 ### Ownership
 
@@ -71,6 +71,7 @@ Create one canonical provider system in the foundational layers.
 - add provider-aware base URL resolution
 - normalize runtime provider lookup
 - fix local/private endpoint classification for OpenAI-compatible providers
+- remove Anthropic as the hidden default fallback for unrelated providers where shared foundation code currently assumes it
 
 ### Why separate
 
@@ -86,7 +87,7 @@ This work defines the contract that `query`, `tui`, `commands`, and `cli` should
 
 ### Goal
 
-Apply the provider foundation consistently across the user-facing and runtime layers.
+Apply the provider foundation consistently across the user-facing and runtime layers, making `llama.cpp` the clean first-class path while keeping Anthropic optional.
 
 ### Ownership
 
@@ -103,6 +104,7 @@ Apply the provider foundation consistently across the user-facing and runtime la
 - restore provider state on session resume
 - resolve `api_base` against the effective provider
 - make the `llama.cpp` flow reliable end to end
+- remove Anthropic-first onboarding and selection behavior where it still shapes the default UX
 
 ### Dependency
 
@@ -112,6 +114,7 @@ This agent should start only after Agent 2 has defined the shared provider behav
 
 - no alias-dependent provider behavior in UI, commands, or runtime
 - clean `llama.cpp` connection and model-selection path
+- Anthropic support remains available but is no longer the hidden product default
 
 ## Agent 4: Interface Truthfulness
 
@@ -211,6 +214,7 @@ Focus:
 Focus:
 - canonical provider identity
 - auth/base URL/default-model foundation
+- removing Anthropic-first shared defaults
 
 ### Workstream C
 
@@ -218,6 +222,7 @@ Focus:
 
 Focus:
 - provider rollout into UI, commands, CLI, and runtime
+- `llama.cpp` as the clean default local path
 
 Note:
 - start after Workstream B has produced the provider contract
@@ -258,6 +263,7 @@ Suggested output format from each sub-agent:
 
 - do not revert unrelated edits
 - do not redefine shared provider behavior outside the provider-foundation workstream
+- do not introduce new Anthropic-first defaults while fixing provider logic
 - if blocked by another workstream, stop and report the dependency instead of inventing a parallel contract
 - prefer small commits per fix cluster
 - keep file ownership clear when touching shared modules like `query`, `commands`, or `bridge`
@@ -278,6 +284,7 @@ Assign Agent 2:
 
 - define canonical provider normalization
 - fix auth/env/default-model/base URL resolution in `core` and `api`
+- remove hidden Anthropic-first shared fallbacks
 
 ### Third handoff
 
@@ -292,6 +299,7 @@ Assign Agent 3:
 
 - roll the provider foundation into `query`, `tui`, `commands`, and `cli`
 - verify `llama.cpp` end-to-end behavior
+- remove Anthropic-first UX and default-selection behavior
 
 ### Fifth handoff
 

@@ -11,6 +11,7 @@ This is not a design doc for every fix. It is a sequencing document.
 3. Fix runtime truth mismatches before improving reporting surfaces.
 4. Prefer coordinated cross-module sweeps where one root cause appears in many crates.
 5. Prefer shrinking or disabling misleading optional surfaces over investing in broad partial support.
+6. Remove Anthropic-first defaults before investing in new provider breadth.
 
 ## Phase 0: Stabilize the Safety Boundary
 
@@ -178,6 +179,58 @@ Expected phase outcome:
 - provider ID aliases are accepted only at input edges
 - the stored/runtime provider identity is canonical everywhere else
 - provider-specific auth, default models, base URLs, and registry lookups behave consistently
+
+## Phase 2.5: Remove Anthropic Centrality
+
+Goal: keep Anthropic support, but stop treating it as the implicit product default in runtime behavior, UX, and architecture.
+
+Sources:
+- [core_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/core_review.md)
+- [cli_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/cli_review.md)
+- [commands_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/commands_review.md)
+- [tui_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tui_review.md)
+- [api_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/api_review.md)
+
+### 2.5.1 Make `llama.cpp` the clean default local path
+
+Fix set:
+- ensure onboarding and `/connect` emphasize `llama.cpp`
+- ensure local model discovery works without Anthropic-first fallback behavior
+- ensure `api_base` and model selection behave correctly for `llama.cpp` without extra config gymnastics
+
+Primary modules:
+- `tui`
+- `commands`
+- `cli`
+
+### 2.5.2 Make Anthropic explicit rather than implicit
+
+Fix set:
+- remove control-flow assumptions that default to `anthropic` unless a provider is explicitly chosen
+- stop using Anthropic model families as unrelated-provider fallbacks
+- reduce Anthropic-specific bootstrap assumptions in auth and resume paths
+
+Primary modules:
+- `core`
+- `cli`
+- `query`
+
+### 2.5.3 Move toward provider-neutral runtime abstractions
+
+Fix set:
+- reduce reliance on Anthropic-shaped naming and fallback semantics in generic runtime code
+- prefer generic provider/client/event concepts where practical
+- keep Anthropic-specific code inside the Anthropic provider path rather than in shared layers
+
+Primary modules:
+- `api`
+- `query`
+- `tui`
+
+Expected phase outcome:
+- Anthropic remains supported
+- Anthropic is no longer the hidden product identity
+- `llama.cpp` becomes the clean first-class path in the actual behavior of the app
 
 ## Phase 3: Make Reported Capabilities Match Runtime Truth
 
@@ -372,6 +425,7 @@ Modules:
 - `commands /providers` should wait until runtime provider truth is fixed in `core` and `api`.
 - ACP runtime-backed model/tool discovery should ideally wait until provider/tool truth surfaces are stabilized.
 - scope-reduction decisions for `acp`, `bridge`, `mcp`, `plugins`, and `buddy` should be made before investing in feature expansion within those modules.
+- removing Anthropic centrality should begin only after canonical provider behavior is defined, otherwise the fallback logic will just move around.
 
 ## Fastest Risk-Reduction Order
 
@@ -383,10 +437,11 @@ If only a small number of fixes can be done now, use this order:
 4. `bridge`: outbound event durability and outer reconnect.
 5. `core` + `api`: shared provider canonicalization foundation.
 6. `query` + `tui` + `commands` + `cli`: provider canonicalization rollout.
-7. `plugins`: real reload semantics.
-8. `acp`: remove or implement fake session behavior.
-9. `mcp`: real transport support and OAuth completion correctness.
-10. reduce or disable optional surfaces that are still not aligned with the local-first vision.
+7. remove Anthropic-first defaults and make `llama.cpp` the clean first-class path.
+8. `plugins`: real reload semantics.
+9. `acp`: remove or implement fake session behavior.
+10. `mcp`: real transport support and OAuth completion correctness.
+11. reduce or disable optional surfaces that are still not aligned with the local-first vision.
 
 ## Completion Criterion
 
@@ -395,6 +450,8 @@ The refactor/reliability wave is in good shape when:
 - no core execution path can silently drop conversation state
 - no tool can mutate files outside approved roots
 - provider identity is canonical across config, runtime, UI, and auth
+- Anthropic support is explicit and optional rather than the hidden default path
+- `llama.cpp` is the clean default local workflow
 - operational surfaces report actual runtime truth
 - plugin and bridge state survive transient failures without silent drift
 - optional modules have either honest minimal scope or are no longer on the critical path

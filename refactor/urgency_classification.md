@@ -103,6 +103,10 @@ Useful improvements, lower-blast-radius correctness fixes, and cleanup that shou
 
 The same root problem appears in `core`, `api`, `query`, `tui`, `commands`, `cli`, and `fix_plan_1.md`. This is not a one-off bug. It is a systemic normalization failure affecting auth lookup, default model choice, registry lookup, `/connect`, `/model`, resume flows, and `api_base` overrides.
 
+### Anthropic centrality is a second provider-layer problem
+
+Separate from provider canonicalization, the codebase still treats Anthropic as the hidden default in multiple places: default models, auth bootstrap, onboarding, model inference, runtime fallbacks, and UI behavior. For the local-first vision, this should be treated as a deliberate refactor target: Anthropic stays supported, but only as an explicit provider choice.
+
 ### Runtime truth vs advertised truth is the second major cluster
 
 `commands`, `acp`, `mcp`, `plugins`, and `bridge` all have places where the interface claims more than the runtime actually provides. These are dangerous because they create false confidence and make debugging much slower.
@@ -127,7 +131,7 @@ The biggest non-core complexity comes from `acp`, `bridge`, `mcp`, `plugins`, an
 - `commands`
 - `cli`
 
-These modules define the trustworthy local-first path and should be improved, not reduced.
+These modules define the trustworthy local-first path and should be improved, not reduced. They are also where Anthropic-first defaults need to be removed.
 
 ### Keep but constrain
 
@@ -162,6 +166,7 @@ If the goal is to reduce the most real risk quickly, the first wave should be:
 3. [tools_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tools_review.md): filesystem path-boundary enforcement.
 4. [bridge_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/bridge_review.md): outbound event loss and missing outer reconnect.
 5. [core_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/core_review.md), [api_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/api_review.md), [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md), [tui_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tui_review.md), [commands_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/commands_review.md), [cli_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/cli_review.md): unify provider canonicalization and provider-aware config resolution as a coordinated sweep.
+6. [core_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/core_review.md), [api_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/api_review.md), [query_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/query_review.md), [tui_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/tui_review.md), [commands_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/commands_review.md), [cli_review.md](/home/manager/Agents/temp/toolsTest/claude/claurst/refactor/cli_review.md): remove Anthropic-first defaults and make `llama.cpp` the explicit first-class path.
 
 ## Practical Reduction Candidates
 

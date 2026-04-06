@@ -4,13 +4,14 @@ Purpose: define the target shape of the codebase so refactoring decisions are ma
 
 ## Vision Statement
 
-Build a lean, local-first coding agent centered on `llama.cpp`, with safe tools, predictable runtime behavior, and a compact feature set that is fully trustworthy.
+Build a lean, local-first coding agent where `llama.cpp` is the clean first-class path, Anthropic remains an optional supported provider, and the core runtime is safe, predictable, and fully trustworthy.
 
 ## Core Product Direction
 
 The product should optimize for:
 
 - first-class `llama.cpp` support
+- Anthropic as optional support, not product identity
 - reliable local usage
 - a small but high-quality feature set
 - tools that work consistently
@@ -24,6 +25,7 @@ The goal is:
 - one excellent local path
 - one understandable execution model
 - one trustworthy basic workflow
+- no hardwired Claude-first behavior in defaults, UX, or architecture
 
 ## Primary User Promise
 
@@ -34,6 +36,7 @@ The user should be able to:
 3. run a stable chat/session loop
 4. use a core set of tools safely
 5. trust that the UI, commands, and runtime all describe the same state
+6. use Anthropic if desired, without the rest of the app assuming it is the default
 
 ## Design Principles
 
@@ -47,6 +50,17 @@ That means:
 - local model discovery must be reliable
 - base URL overrides must be easy and correct
 - local providers must not be penalized by remote-provider assumptions
+
+### 1a. Anthropic is optional, not central
+
+Anthropic support can stay, but it should no longer define the default identity of the application.
+
+That means:
+
+- Anthropic should not be the implied provider in control flow unless explicitly selected
+- Anthropic model families should not define the default model behavior for unrelated providers
+- UI, onboarding, and command surfaces should not present Anthropic as the assumed main path
+- internal abstractions should be provider-neutral wherever practical
 
 ### 2. Correctness before breadth
 
@@ -119,6 +133,7 @@ These are the features that should be excellent before expanding scope.
 - endpoint override support
 - model discovery
 - canonical provider persistence
+- no hidden Anthropic-first fallback behavior on the local path
 
 ### 2. Session runtime
 
@@ -155,6 +170,7 @@ The following should be accurate and dependable:
 These should not drive the codebase until the core is solid:
 
 - maximizing provider count
+- keeping Anthropic as a hidden default in architecture or UX
 - keeping every integration surface equally feature-rich
 - adding more commands before fixing state correctness
 - polishing advanced remote features before local reliability is solved
@@ -213,10 +229,12 @@ The codebase should be made leaner by:
 - bounded core tools
 - canonical provider handling
 - the small control surface around `/connect`, `/model`, `/providers`, `/status`, and `/config`
+- provider-neutral runtime abstractions
 
 ### Shrink aggressively
 
 - provider alias branches spread across multiple crates
+- Anthropic-first defaults in model choice, auth bootstrap, onboarding, and command behavior
 - plugin reload and marketplace complexity unless it is made trustworthy
 - MCP breadth beyond the transport and routing modes actually used
 - command and reporting surfaces that claim more than they can verify live
@@ -268,6 +286,7 @@ Everything else should be secondary to this path:
 - correct `api_base` resolution
 - synchronized provider/model state
 - reliable `llama.cpp` local flow
+- remove Anthropic as the implicit default path in config, onboarding, and runtime selection
 
 ### Priority 3: truthful interfaces
 
@@ -295,9 +314,10 @@ The codebase is meaningfully aligned with this vision when:
 1. `llama.cpp` works end to end through `/connect`, `/model`, and live session usage.
 2. No core runtime path can silently destroy or corrupt conversation state.
 3. No tool can mutate files outside approved roots.
-4. Provider identity is canonical across config, auth, UI, runtime, and commands.
-5. Commands and external interfaces report actual runtime truth.
-6. The supported feature set is smaller, clearer, and more reliable than before.
+4. Anthropic support exists only as an explicit provider choice, not as the hidden default identity of the app.
+5. Provider identity is canonical across config, auth, UI, runtime, and commands.
+6. Commands and external interfaces report actual runtime truth.
+7. The supported feature set is smaller, clearer, and more reliable than before.
 
 ## Practical Decision Rule
 
@@ -306,3 +326,9 @@ When deciding whether to keep, refactor, or remove something, ask:
 Does this make the local `llama.cpp` workflow safer, clearer, or more reliable?
 
 If not, it is probably not a priority.
+
+Second question:
+
+Does this keep Anthropic as an optional provider without forcing Anthropic assumptions into unrelated code paths?
+
+If not, it should be redesigned or reduced.
